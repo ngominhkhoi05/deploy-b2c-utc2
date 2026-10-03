@@ -1,0 +1,133 @@
+# =====================================================================
+# Flash Sale B2C - Docker Compose (Production)
+# =====================================================================
+# Mục đích: Chạy toàn bộ stack (Redis + Backend + Frontend Nginx) trên VPS.
+#
+# Cách dùng (trên VPS):
+#   docker compose up -d              # khởi động
+#   docker compose down               # tắt
+#   docker compose logs -f backend    # xem log
+#   docker compose restart backend    # restart 1 service
+#
+# Yêu cầu:
+#   - File .env (chứa toàn bộ biến môi trường)
+#   - Image backend đã build: flash-sale-b2c-backend:latest
+#   - Image frontend đã build: flash-sale-b2c-frontend:latest
+# =====================================================================
+
+services:
+
+  # ── REDIS ─────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: flash-sale-b2c-redis
+    restart: unless-stopped
+    env_file:
+      # Đọc REDIS_PASSWORD (nếu có) từ .env để set requirepass.
+      # REDIS_HOST/PORT_REDIS KHÔNG được dùng cho container này — nó đã
+      # biết nó là Redis server.
+      - .env
+    command: >
+      sh -c "
+        if [ -n \"$$REDIS_PASSWORD\" ]; then
+          exec redis-server --requirepass \"$$REDIS_PASSWORD\"
+        else
+          exec redis-server
+        fi
+      "
+    volumes:
+      # Persistent data Redis — tồn tại qua các lần `docker compose down`
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - flash-sale-net
+
+  # ── BACKEND (Spring Boot) ─────────────────────────────────────────────
+  backend:
+    image: flash-sale-b2c-backend:latest
+    container_name: flash-sale-b2c-backend
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Override dùng internal Docker DNS name cho Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # DB_HOST giữ nguyên trong .env (Supabase Cloud)
+      TZ: Asia/Ho_Chi_Minh
+      JAVA_OPTS: ${JAVA_OPTS:-"-Xmx1024m -Xms512m -XX:+UseG1GC"}
+    ports:
+      # Bind localhost:8080, KHÔNG public ra ngoài.
+      # Nginx sẽ proxy /api → backend:8080.
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    networks:
+      - flash-sale-net
+
+  # ── FRONTEND (Nginx reverse proxy + Next.js app) ─────────────────────
+  # Container Nginx serve user request + proxy /api, /ws → backend.
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: flash-sale-b2c-nginx
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    ports:
+      # Port 80 - truy cập http://<VPS_IP>
+      - "80:80"
+    volumes:
+      # Relative path so compose chạy được trên cả Windows (dev/test)
+      # lẫn Linux VPS (prod). Trên VPS chạy `cd /opt/deploy-b2c-utc2`
+      # trước khi `docker compose up -d`.
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - flash-sale-net
+
+  frontend:
+    image: flash-sale-b2c-frontend:latest
+    container_name: flash-sale-b2c-frontend
+    restart: unless-stopped
+    expose:
+      # Chỉ expose cho Nginx proxy, KHÔNG public ra ngoài.
+      - "3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - flash-sale-net
+
+# ── VOLUMES ─────────────────────────────────────────────────────────────
+volumes:
+  redis-data:
+    name: flash-sale-b2c-redis-data
+
+# ── NETWORKS ────────────────────────────────────────────────────────────
+networks:
+  flash-sale-net:
+    name: flash-sale-net
+    driver: bridge

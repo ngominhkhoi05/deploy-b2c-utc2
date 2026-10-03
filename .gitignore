@@ -1,0 +1,70 @@
+# =====================================================================
+# .gitignore cho thư mục deploy-b2c-utc2
+# =====================================================================
+# Mục đích: Bảo vệ secret + file backup + log khỏi bị commit nhầm.
+# Repo này có thể public/private tuỳ bạn — nhưng secret PHẢI được ignore.
+# =====================================================================
+
+# ── File bí mật (TUYỆT ĐỐI KHÔNG COMMIT) ────────────────────────────────
+.env
+.env.*
+!.env.example
+db.env
+*.env.local
+*.env.production
+*.env.staging
+
+# Cloudinary / OAuth / Payment secret nếu tách file
+cloudinary.env
+oauth.env
+secrets/
+
+# ── PEM / Key / Certificate ─────────────────────────────────────────────
+*.pem
+*.key
+*.cert
+*.p12
+*.jks
+keystore.*
+truststore.*
+
+# ── Backup & Dump (DB / Redis) ─────────────────────────────────────────
+db/backups/
+*.sql
+*.sql.gz
+*.dump
+*.backup
+*.rdb
+*.aof
+
+# ── Docker artifacts ──────────────────────────────────────────────────
+docker-compose.override.yml
+docker-compose.local.yml
+*.override.yml
+*.local.yml
+
+# ── Editor / IDE ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*.iml
+
+# ── OS ────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Log files ─────────────────────────────────────────────────────────
+*.log
+logs/
+logs/*.log
+docker-compose.log
+
+# ── Build / runtime output ────────────────────────────────────────────
+build/
+dist/
+node_modules/
+.next/
+out/
+.gradle/

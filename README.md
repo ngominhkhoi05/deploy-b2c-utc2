@@ -351,9 +351,11 @@ vi redis.env   # đặt REDIS_PASSWORD (nếu muốn bảo vệ Redis)
 
 ```bash
 cd /opt/flash-sale/deploy-b2c-utc2
-chmod +x scripts/*.sh
+git pull
 ./scripts/deploy.sh
 ```
+
+> 💡 Từ commit `f1375d9` trở đi, file trong `scripts/` đã có quyền executable (mode `755`) sẵn trong Git, nên **không cần** `chmod +x` nữa. Lệnh đó chỉ có tác dụng ở các bản cũ.
 
 Script sẽ:
 1. Kiểm tra `.env` và `redis.env` tồn tại
@@ -369,6 +371,13 @@ Script sẽ:
 > docker network rm flash-sale-net
 > ./scripts/deploy.sh
 > ```
+
+> ⚠️ **`git pull` bị từ chối** với lỗi `Your local changes to the following files would be overwritten by merge`? Thường do đã chạy `chmod +x scripts/*.sh` trên VPS — Git coi đó là thay đổi local, trong khi file trong repo lại ở mode khác. Bỏ thay đổi local rồi pull lại:
+> ```bash
+> git checkout -- scripts/
+> git pull
+> ```
+> File trong repo đã có quyền execute sẵn nên không cần `chmod` nữa.
 
 **Kiểm tra trạng thái:**
 ```bash

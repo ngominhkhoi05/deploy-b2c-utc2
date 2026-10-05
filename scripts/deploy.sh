@@ -27,16 +27,39 @@ echo "  Working dir: $DEPLOY_DIR"
 echo "=================================================="
 
 # ─── 1. Kiểm tra file .env ─────────────────────────────────────────────
+# Chọn editor có sẵn trên VPS (Ubuntu minimal thường không có nano).
+# Dung if/then/fi thay vi && { } de tuong thich sh cua busybox.
+detect_editor() {
+    if [ -n "${EDITOR:-}" ] && command -v "$EDITOR" >/dev/null 2>&1; then
+        echo "$EDITOR"
+        return 0
+    fi
+    if command -v nano >/dev/null 2>&1; then
+        echo "nano"
+        return 0
+    fi
+    if command -v vi >/dev/null 2>&1; then
+        echo "vi"
+        return 0
+    fi
+    echo "vi"
+}
+
 if [ ! -f ".env" ]; then
+    _ED="$(detect_editor)"
     echo "❌ Chưa có file .env. Hãy copy từ .env.example và điền giá trị thật:"
-    echo "    cp .env.example .env && nano .env"
+    echo "    cp .env.example .env"
+    echo "    ${_ED} .env"
+    command -v nano >/dev/null 2>&1 || \
+        echo "    (nano không có sẵn — cài bằng: apt update && apt install -y nano)"
     exit 1
 fi
 
 # ─── 1b. Kiểm tra file redis.env ────────────────────────────────────────
 if [ ! -f "redis.env" ]; then
     echo "❌ Chưa có file redis.env. Hãy copy từ redis.env.example:"
-    echo "    cp redis.env.example redis.env && nano redis.env"
+    echo "    cp redis.env.example redis.env"
+    echo "    $(detect_editor) redis.env"
     exit 1
 fi
 

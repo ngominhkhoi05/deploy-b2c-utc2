@@ -279,9 +279,28 @@ cd /opt/flash-sale/deploy-b2c-utc2
 cp .env.example .env
 cp redis.env.example redis.env
 
-nano .env        # điền giá trị thật
-nano redis.env   # đặt REDIS_PASSWORD (nếu muốn bảo vệ Redis)
+vi .env        # điền giá trị thật
+vi redis.env   # đặt REDIS_PASSWORD (nếu muốn bảo vệ Redis)
 ```
+
+> 💡 **Dùng `vi` không `nano`** — Ubuntu 25.04 minimal **không có `nano` mặc định** (`nano: command not found`). `vi` luôn có sẵn.
+>
+> Nếu quen `nano` hơn, cài 1 lần rồi xài vĩnh viễn:
+> ```bash
+> apt update && apt install -y nano
+> ```
+>
+> **Cách nhanh nhất không cần editor** — sửa trực tiếp bằng `sed`:
+> ```bash
+> # Ví dụ đặt VPS_IP
+> sed -i "s|^VPS_IP=.*|VPS_IP=172.20.10.5|" .env
+> ```
+> | Phím tắt trong `vi` | Tác dụng |
+> |---|---|
+> | `i` | Vào chế độ nhập (insert) |
+> | `Esc` | Thoát chế độ nhập |
+> | `:wq` | Lưu và thoát |
+> | `:q!` | Thoát **không** lưu |
 
 **Biến BẮT BUỘC phải điền trong `.env`:**
 

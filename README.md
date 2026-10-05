@@ -64,18 +64,18 @@ Vì server sẽ deploy **nhiều dự án**, tất cả dùng chung tiền tố 
 
 ```
 /opt/flash-sale/
-├── be/         # Repo backend  (NgocHiep-Nguyen/flash-sale-b2c-UTC2) — Spring Boot / Java 25
-├── fe/         # Repo frontend (ngominhkhoi05/flash-sale-b2c)         — Next.js
-└── deploy/     # Repo deploy    (ngominhkhoi05/deploy-b2c-utc2)       — compose + nginx + scripts
+├── flash-sale-b2c-UTC2/   # Repo backend  (NgocHiep-Nguyen/...) — Spring Boot / Java 25
+├── flash-sale-b2c/        # Repo frontend (ngominhkhoi05/...)   — Next.js
+└── deploy-b2c-utc2/       # Repo deploy    (ngominhkhoi05/...)   — compose + nginx + scripts
 ```
 
-**Lưu ý đặt tên:** thư mục trên VPS là `be/`, `fe/`, `deploy/` cho gọn, nhưng tên repo local vẫn là:
+**Lưu ý đặt tên:** thư mục trên VPS trùng **đúng tên repo** để tránh nhầm khi debug. Tên repo local trên Windows cũng vậy — chỉ khác ở chữ hoa/thường và dấu gạch chéo.
 
 | Thư mục trên VPS | Repo local (Windows) | GitHub |
 |---|---|---|
-| `/opt/flash-sale/be/` | `D:\flash-sale-b2c-UTC2` | `NgocHiep-Nguyen/flash-sale-b2c-UTC2` |
-| `/opt/flash-sale/fe/` | `D:\flash-sale-b2c` | `ngominhkhoi05/flash-sale-b2c` |
-| `/opt/flash-sale/deploy/` | `D:\deploy-b2c-utc2` | `ngominhkhoi05/deploy-b2c-utc2` |
+| `/opt/flash-sale/flash-sale-b2c-UTC2/` | `D:\flash-sale-b2c-UTC2` | `NgocHiep-Nguyen/flash-sale-b2c-UTC2` |
+| `/opt/flash-sale/flash-sale-b2c/` | `D:\flash-sale-b2c` | `ngominhkhoi05/flash-sale-b2c` |
+| `/opt/flash-sale/deploy-b2c-utc2/` | `D:\deploy-b2c-utc2` | `ngominhkhoi05/deploy-b2c-utc2` |
 
 ---
 
@@ -138,7 +138,7 @@ redis-cli ping                     # → PONG
 ### 3.4 Tạo thư mục chứa 3 repo
 
 ```bash
-mkdir -p /opt/flash-sale/{be,fe,deploy}
+mkdir -p /opt/flash-sale/{flash-sale-b2c-UTC2,flash-sale-b2c,deploy-b2c-utc2}
 ls -la /opt/flash-sale
 ```
 
@@ -170,26 +170,26 @@ ufw enable
 
 ```bash
 # Trên Windows PowerShell
-scp -r D:\flash-sale-b2c-UTC2 root@<VPS_IP>:/opt/flash-sale/be_tmp
-scp -r D:\flash-sale-b2c     root@<VPS_IP>:/opt/flash-sale/fe_tmp
-scp -r D:\deploy-b2c-utc2    root@<VPS_IP>:/opt/flash-sale/deploy_tmp
+scp -r D:\flash-sale-b2c-UTC2 root@<VPS_IP>:/opt/flash-sale/flash-sale-b2c-UTC2_tmp
+scp -r D:\flash-sale-b2c     root@<VPS_IP>:/opt/flash-sale/flash-sale-b2c_tmp
+scp -r D:\deploy-b2c-utc2    root@<VPS_IP>:/opt/flash-sale/deploy-b2c-utc2_tmp
 ```
 
 **Trên VPS (đổi tên về tên chuẩn):**
 ```bash
 cd /opt/flash-sale
-rm -rf be fe deploy
-mv be_tmp be
-mv fe_tmp fe
-mv deploy_tmp deploy
+rm -rf flash-sale-b2c-UTC2 flash-sale-b2c deploy-b2c-utc2
+mv flash-sale-b2c-UTC2_tmp flash-sale-b2c-UTC2
+mv flash-sale-b2c_tmp      flash-sale-b2c
+mv deploy-b2c-utc2_tmp    deploy-b2c-utc2
 ```
 
 > ⚠️ `scp -r` chuyển cả `node_modules/` (FE) và `build/` + `.gradle/` (BE) → **rất chậm** (hàng trăm MB). Có thể loại trước:
 > ```powershell
 > # Windows PowerShell — tạo bản sạch trước khi scp
-> robocopy D:\flash-sale-b2c D:\tmp\fe /E /XD node_modules .next .git
-> robocopy D:\flash-sale-b2c-UTC2 D:\tmp\be /E /XD build .gradle bin .git
-> robocopy D:\deploy-b2c-utc2 D:\tmp\deploy /E /XD .git
+> robocopy D:\flash-sale-b2c      D:\tmp\flash-sale-b2c      /E /XD node_modules .next .git
+> robocopy D:\flash-sale-b2c-UTC2 D:\tmp\flash-sale-b2c-UTC2 /E /XD build .gradle bin .git
+> robocopy D:\deploy-b2c-utc2     D:\tmp\deploy-b2c-utc2     /E /XD .git
 > ```
 
 ### 4.2 Cách 2 (khuyến nghị): `git clone` trên VPS
@@ -197,11 +197,11 @@ mv deploy_tmp deploy
 ```bash
 # Trên VPS
 cd /opt/flash-sale
-rm -rf be fe deploy
+rm -rf flash-sale-b2c-UTC2 flash-sale-b2c deploy-b2c-utc2
 
-git clone https://github.com/NgocHiep-Nguyen/flash-sale-b2c-UTC2.git be
-git clone https://github.com/ngominhkhoi05/flash-sale-b2c.git         fe
-git clone https://github.com/ngominhkhoi05/deploy-b2c-utc2.git       deploy
+git clone https://github.com/NgocHiep-Nguyen/flash-sale-b2c-UTC2.git flash-sale-b2c-UTC2
+git clone https://github.com/ngominhkhoi05/flash-sale-b2c.git         flash-sale-b2c
+git clone https://github.com/ngominhkhoi05/deploy-b2c-utc2.git       deploy-b2c-utc2
 ```
 
 **Trên Windows (để có repo local để sửa code):**
@@ -218,11 +218,11 @@ cd D:\deploy-b2c-utc2    && git add -A && git commit -m "..." && git push
 ### 5.1 Build Backend
 
 ```bash
-cd /opt/flash-sale/be
+cd /opt/flash-sale/flash-sale-b2c-UTC2
 
 docker build -t flash-sale-b2c-backend:latest \
-    -f /opt/flash-sale/deploy/docker/backend.Dockerfile \
-    /opt/flash-sale/be/
+    -f /opt/flash-sale/deploy-b2c-utc2/docker/backend.Dockerfile \
+    /opt/flash-sale/flash-sale-b2c-UTC2/
 ```
 
 > Lần đầu: ~5 phút (download Gradle dependencies ~300MB).
@@ -230,13 +230,13 @@ docker build -t flash-sale-b2c-backend:latest \
 ### 5.2 Build Frontend
 
 ```bash
-cd /opt/flash-sale/fe
+cd /opt/flash-sale/flash-sale-b2c
 
 # BẮT BUỘC truyền build-arg NEXT_PUBLIC_API_BASE
 docker build -t flash-sale-b2c-frontend:latest \
     --build-arg NEXT_PUBLIC_API_BASE=/api/v1 \
-    -f /opt/flash-sale/deploy/docker/frontend.Dockerfile \
-    /opt/flash-sale/fe/
+    -f /opt/flash-sale/deploy-b2c-utc2/docker/frontend.Dockerfile \
+    /opt/flash-sale/flash-sale-b2c/
 ```
 
 > ⚠️ **Bắt buộc phải truyền `--build-arg NEXT_PUBLIC_API_BASE=/api/v1`.**
@@ -256,7 +256,7 @@ docker images | grep flash-sale-b2c
 ## 6. Cấu hình biến môi trường
 
 ```bash
-cd /opt/flash-sale/deploy
+cd /opt/flash-sale/deploy-b2c-utc2
 cp .env.example .env
 cp redis.env.example redis.env
 
@@ -291,7 +291,7 @@ nano redis.env   # đặt REDIS_PASSWORD (nếu muốn bảo vệ Redis)
 ## 7. Khởi động stack
 
 ```bash
-cd /opt/flash-sale/deploy
+cd /opt/flash-sale/deploy-b2c-utc2
 chmod +x scripts/*.sh
 ./scripts/deploy.sh
 ```
@@ -303,7 +303,7 @@ Script sẽ:
 
 **Kiểm tra trạng thái:**
 ```bash
-cd /opt/flash-sale/deploy
+cd /opt/flash-sale/deploy-b2c-utc2
 docker compose ps
 
 # NAME                    STATUS              PORTS
@@ -329,7 +329,7 @@ http://<VPS_IP>
 ### 8.2 Health check tổng thể
 
 ```bash
-cd /opt/flash-sale/deploy
+cd /opt/flash-sale/deploy-b2c-utc2
 ./scripts/check-health.sh
 ```
 
@@ -359,13 +359,13 @@ cd D:\flash-sale-b2c-UTC2 && git add -A && git commit -m "..." && git push
 
 **Trên VPS:**
 ```bash
-cd /opt/flash-sale/be && git pull
+cd /opt/flash-sale/flash-sale-b2c-UTC2 && git pull
 
 docker build -t flash-sale-b2c-backend:latest \
-    -f /opt/flash-sale/deploy/docker/backend.Dockerfile \
-    /opt/flash-sale/be/
+    -f /opt/flash-sale/deploy-b2c-utc2/docker/backend.Dockerfile \
+    /opt/flash-sale/flash-sale-b2c-UTC2/
 
-cd /opt/flash-sale/deploy
+cd /opt/flash-sale/deploy-b2c-utc2
 docker compose up -d --no-deps backend
 ```
 
@@ -378,28 +378,28 @@ cd D:\flash-sale-b2c && git add -A && git commit -m "..." && git push
 
 **Trên VPS:**
 ```bash
-cd /opt/flash-sale/fe && git pull
+cd /opt/flash-sale/flash-sale-b2c && git pull
 
 docker build -t flash-sale-b2c-frontend:latest \
     --build-arg NEXT_PUBLIC_API_BASE=/api/v1 \
-    -f /opt/flash-sale/deploy/docker/frontend.Dockerfile \
-    /opt/flash-sale/fe/
+    -f /opt/flash-sale/deploy-b2c-utc2/docker/frontend.Dockerfile \
+    /opt/flash-sale/flash-sale-b2c/
 
-cd /opt/flash-sale/deploy
+cd /opt/flash-sale/deploy-b2c-utc2
 docker compose up -d --no-deps frontend
 ```
 
 ### 9.3 Khi sửa Nginx config
 
 ```bash
-cd /opt/flash-sale/deploy
+cd /opt/flash-sale/deploy-b2c-utc2
 docker compose restart nginx
 ```
 
 ### 9.4 Khi đổi secret trong `.env` (DB, JWT...)
 
 ```bash
-cd /opt/flash-sale/deploy
+cd /opt/flash-sale/deploy-b2c-utc2
 docker compose up -d --force-recreate backend
 ```
 
@@ -429,7 +429,7 @@ networks:
 ```bash
 # Nguyên nhân: backend.Dockerfile có dòng COPY gradle.properties
 # nhưng repo BE hiện KHÔNG có file này → build fail ngay.
-cd /opt/flash-sale/be
+cd /opt/flash-sale/flash-sale-b2c-UTC2
 touch gradle.properties
 # hoặc sửa Dockerfile: bỏ gradle.properties khỏi dòng COPY
 ```
@@ -438,25 +438,25 @@ touch gradle.properties
 
 ```bash
 # Nguyên nhân: build thiếu --build-arg NEXT_PUBLIC_API_BASE
-cd /opt/flash-sale/deploy
+cd /opt/flash-sale/deploy-b2c-utc2
 docker compose logs frontend
 ```
 
 **Cách sửa:**
 ```bash
-cd /opt/flash-sale/fe
+cd /opt/flash-sale/flash-sale-b2c
 docker build -t flash-sale-b2c-frontend:latest \
     --build-arg NEXT_PUBLIC_API_BASE=/api/v1 \
-    -f /opt/flash-sale/deploy/docker/frontend.Dockerfile \
-    /opt/flash-sale/fe/
+    -f /opt/flash-sale/deploy-b2c-utc2/docker/frontend.Dockerfile \
+    /opt/flash-sale/flash-sale-b2c/
 
-cd /opt/flash-sale/deploy && docker compose up -d --no-deps frontend
+cd /opt/flash-sale/deploy-b2c-utc2 && docker compose up -d --no-deps frontend
 ```
 
 ### 10.3 Backend không healthy → `/actuator/health` trả 404
 
 ```bash
-cd /opt/flash-sale/deploy
+cd /opt/flash-sale/deploy-b2c-utc2
 docker compose logs backend | tail -50
 ```
 
@@ -502,7 +502,7 @@ nginx:
 ```
 
 ```bash
-cd /opt/flash-sale/deploy
+cd /opt/flash-sale/deploy-b2c-utc2
 docker compose logs backend | tail -50      # ← xem lỗi thật ở đây
 ```
 
@@ -514,7 +514,7 @@ docker compose logs backend | tail -50      # ← xem lỗi thật ở đây
 
 **Bypass để xem log backend:**
 ```bash
-cd /opt/flash-sale/deploy
+cd /opt/flash-sale/deploy-b2c-utc2
 docker compose up -d backend
 docker compose logs -f backend
 ```
@@ -522,7 +522,7 @@ docker compose logs -f backend
 ### 10.5 Backend không kết nối được DB
 
 ```bash
-cd /opt/flash-sale/deploy
+cd /opt/flash-sale/deploy-b2c-utc2
 docker compose logs backend | grep -i "connection\|ssl\|error"
 ```
 
@@ -542,7 +542,7 @@ docker compose logs backend | grep -i "connection\|ssl\|error"
 ### 10.6 Redis không hoạt động
 
 ```bash
-cd /opt/flash-sale/deploy
+cd /opt/flash-sale/deploy-b2c-utc2
 
 # Redis trong container
 docker exec flash-sale-b2c-redis redis-cli ping     # → PONG
@@ -562,7 +562,7 @@ redis-cli ping
 ### 10.7 CORS bị chặn khi FE gọi API
 
 ```bash
-cd /opt/flash-sale/deploy
+cd /opt/flash-sale/deploy-b2c-utc2
 grep CORS_ALLOWED_ORIGINS .env
 ```
 
@@ -600,14 +600,14 @@ echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
 ### 10.10 Đổi tên/move thư mục trong `docker-compose.yml`
 
-`nginx/default.conf` được mount bằng **đường dẫn tương đối** (`./nginx/default.conf`). Vì vậy **luôn `cd /opt/flash-sale/deploy` trước khi chạy `docker compose`**, nếu không sẽ báo lỗi mount file không tồn tại.
+`nginx/default.conf` được mount bằng **đường dẫn tương đối** (`./nginx/default.conf`). Vì vậy **luôn `cd /opt/flash-sale/deploy-b2c-utc2` trước khi chạy `docker compose`**, nếu không sẽ báo lỗi mount file không tồn tại.
 
 ---
 
 ## Hỗ trợ
 
 ```bash
-cd /opt/flash-sale/deploy
+cd /opt/flash-sale/deploy-b2c-utc2
 ./scripts/check-health.sh > health-report.txt
 docker compose logs --no-color > all-logs.txt
 ```

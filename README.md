@@ -246,6 +246,13 @@ docker build -t flash-sale-b2c-backend:latest \
 
 > Lần đầu: ~5 phút (download Gradle dependencies ~300MB).
 
+> ⚠️ **Phải rebuild mỗi khi `docker/backend.Dockerfile` thay đổi.** `git pull` trong `deploy-b2c-utc2` **không** cập nhật image đã build. Nếu Dockerfile thêm `apt-get install curl` mà bạn không rebuild, container vẫn chạy image cũ không có `curl` → healthcheck fail với `curl: not found`.
+>
+> ```bash
+> # Xem image đang dùng có curl không (nên trả về đường dẫn):
+> docker exec flash-sale-b2c-backend sh -c 'command -v curl || echo "THIEU CURL - can rebuild image"'
+> ```
+
 ### 5.2 Build Frontend
 
 ```bash
@@ -550,15 +557,26 @@ cd /opt/flash-sale/deploy-b2c-utc2 && docker compose up -d --no-deps frontend
 
 ```bash
 cd /opt/flash-sale/deploy-b2c-utc2
-docker compose logs backend | tail -50
+docker compose logs backend | tail -80
 ```
+
+> ⚠️ **`/bin/sh: 1: wget: not found` trong `docker inspect ... Health.Log`?** Healthcheck cũ dùng `wget` nhưng image `eclipse-temurin` JRE **không có sẵn wget lẫn curl** → mọi lần check đều fail → container `unhealthy` → nginx không start. **Đã sửa:** `docker/backend.Dockerfile` cài `curl`, healthcheck đổi sang `curl`.
+
+> ⚠️ **Chỉ sửa healthcheck chưa đủ** nếu app vẫn crash. `wget: not found` chỉ là *triệu chứng*; app có thể đã chết vì lỗi khác. Luôn đọc `docker compose logs backend` tìm dòng `APPLICATION FAILED TO START` hoặc `Caused by:` — đó mới là nguyên nhân gốc.
 
 **Kiểm tra trực tiếp:**
 ```bash
-docker exec flash-sale-b2c-backend wget -qO- http://localhost:8080/actuator/health
+docker exec flash-sale-b2c-backend curl -fsS http://localhost:8080/actuator/health
 ```
 
 > ✅ **Repo BE ĐÃ có actuator** (`build.gradle`: `spring-boot-starter-actuator`) và `application-prod.yaml` **đã có** mục `management:` expose `health,info`. `SecurityConfig.java` cũng đã `permitAll()` cho `/actuator/health` và `/actuator/info`.
+
+> ⚠️ **Healthcheck đã kiểm tra status == 200, không chỉ "curl thành công".** `curl -f` trả **exit 0 với cả 401/403** (đã test) — chỉ fail từ 400 trở lên. Nếu chỉ dùng `curl -fsS`, một backend bị Security chặn sẽ bị báo healthy. Lệnh hiện tại:
+> ```yaml
+> test: ["CMD-SHELL", "curl -fsS -o /dev/null -w '%{http_code}' http://localhost:8080/actuator/health | grep -qx 200 || exit 1"]
+> ```
+
+**Đã test:** `200` → healthy; `401`, `404`, `503`, connection refused → unhealthy.
 >
 > Vì vậy nếu `/actuator/health` vẫn lỗi thì **không phải thiếu dependency** — hãy kiểm tra theo thứ tự:
 
@@ -571,12 +589,14 @@ docker exec flash-sale-b2c-backend wget -qO- http://localhost:8080/actuator/heal
 
 > 💡 `management.health.db.enabled: true` và `management.health.redis.enabled: true` trong `application-prod.yaml` → actuator sẽ báo `DOWN` nếu **một trong hai** kết nối lỗi. Dùng `show-details: never` nên response chỉ có `{"status":"DOWN"}`, phải xem log mới biết thành phần nào lỗi.
 
-> **Tạm thời bỏ qua actuator** bằng cách đổi healthcheck trong `docker-compose.yml`:
+> **Tạm thời bỏ qua actuator** bằng cách đổi healthcheck trong `docker-compose.yml` (nhớ dùng `curl`, **không** dùng `wget` — xem cảnh báo ở đầu mục):
 > ```yaml
 > backend:
 >   healthcheck:
->     test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/swagger-ui.html || exit 1"]
+>     test: ["CMD-SHELL", "curl -fsS -o /dev/null -w '%{http_code}' http://localhost:8080/swagger-ui/index.html | grep -qx 200 || exit 1"]
 > ```
+>
+> ⚠️ Sửa `docker-compose.yml` **không** thay thế việc rebuild image. Nếu `docker/backend.Dockerfile` chưa được rebuild từ commit có `apt-get install curl` thì container vẫn không có `curl` và healthcheck vẫn fail với `curl: not found`.
 
 ### 10.4 `nginx` không start (Restarting / Exit)
 

@@ -86,11 +86,22 @@ services:
       # Nginx sẽ proxy /api → backend:8080.
       - "127.0.0.1:8080:8080"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/actuator/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 90s
+      # ⚠️ Dùng curl, KHÔNG dùng wget: image eclipse-temurin JRE không có
+      #    sẵn wget (lỗi: "/bin/sh: 1: wget: not found" → mọi lần check fail
+      #    → container unhealthy → nginx không khởi động).
+      #    curl đã được cài trong docker/backend.Dockerfile.
+      #
+      # ⚠️ Phải kiểm tra status == 200, không chỉ "curl thành công":
+      #    curl -f trả exit 0 với cả 401/403 (đã test) — chỉ fail từ 400 trở lên.
+      #    Nếu SecurityConfig chưa permitAll /actuator/health thì 401 vẫn pass
+      #    → healthcheck báo healthy dù app thực tế chưa sẵn sàng.
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null -w '%{http_code}' http://localhost:8080/actuator/health | grep -qx 200 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # App cần thời gian: JVM boot + Flyway migration + kết nối Supabase.
+      # Tổng thời gian chờ = start_period + (retries × interval) = 150 + 75s.
+      start_period: 150s
     networks:
       - flash-sale-net
 

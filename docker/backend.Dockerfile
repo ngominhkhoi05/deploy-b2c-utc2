@@ -47,6 +47,15 @@ FROM eclipse-temurin:25-jre-jammy
 RUN groupadd --system app && \
     useradd --system --gid app --create-home --home-dir /app --shell /sbin/nologin appuser
 
+# ⚠️ PHẢI cài curl: image eclipse-temurin JRE KHÔNG có sẵn wget lẫn curl.
+# Healthcheck trong docker-compose.yml gọi "wget --spider" — nếu không có
+# wget, mọi lần healthcheck đều fail với "/bin/sh: 1: wget: not found"
+# → container unhealthy → nginx (depends_on: service_healthy) không start.
+# curl nhẹ hơn wget và dùng chung cho cả healthcheck lẫn debug.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
 # Tạo thư mục /tmp cho Java với quyền ghi
 # (một số thư viện ghi file tạm vào /tmp như Font cache, OkHttp, ...)
 RUN mkdir -p /tmp && chmod 1777 /tmp
@@ -57,9 +66,9 @@ WORKDIR /app
 # Copy jar từ builder
 COPY --from=builder --chown=appuser:app /build/build/libs/*.jar app.jar
 
-# Healthcheck (Spring Boot Actuator)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD wget -q --spider http://localhost:8080/actuator/health || exit 1
+# Healthcheck (Spring Boot Actuator) — dùng curl vì JRE image không có wget
+HEALTHCHECK --interval=15s --timeout=5s --start-period=150s --retries=5 \
+  CMD curl -fsS http://localhost:8080/actuator/health || exit 1
 
 EXPOSE 8080
 

@@ -6,6 +6,25 @@
 
 ---
 
+## Trạng thái tài liệu
+
+> 📅 **Cập nhật: 05/10/2026** — đồng bộ với code BE branch `dev` (commit `8933200`).
+>
+> **Đã xử lý các lỗi từng gây deploy fail:**
+> - ✅ Actuator đã có trong `build.gradle` + `application-prod.yaml` đã có mục `management:` → `/actuator/health` hoạt động
+> - ✅ `SecurityConfig.java` đã `permitAll()` cho `/actuator/health` và `/actuator/info`
+> - ✅ `?sslmode=require` đã có trong `application-prod.yaml` (profile `prod`)
+> - ✅ `cors.allowed-origins` đã map từ biến môi trường `CORS_ALLOWED_ORIGINS`
+> - ✅ `docker/backend.Dockerfile` dùng `COPY --optional gradle.properties` → build không còn fail khi thiếu file
+>
+> **Chưa có code BE đọc** (biến `.env` bị bỏ qua): `WS_ENDPOINT`, `PAYMENT_GATEWAY_*`, `CLOUDINARY_*`
+>
+> **Còn tồn tại:** repo BE chưa có file `gradle.properties` (không ảnh hưởng build nhờ `--optional`).
+>
+> ⚠️ Khi có thay đổi mới ở repo BE, cập nhật lại mục này.
+
+---
+
 ## Mục lục
 
 1. [Tổng quan kiến trúc](#1-tổng-quan-kiến-trúc)
@@ -277,14 +296,35 @@ nano redis.env   # đặt REDIS_PASSWORD (nếu muốn bảo vệ Redis)
 | `JWT_SECRET` | `openssl rand -base64 64` (tối thiểu 32 ký tự) |
 | `CORS_ALLOWED_ORIGINS` | `http://<VPS_IP>` |
 
-> ⚠️ **KHÔNG viết comment inline sau dấu `=`** trong `.env`. Ví dụ `JWT_EXPIRATION_MS=3600000  # 1 giờ` sẽ khiến giá trị bị đọc thành chuỗi có khoảng trắng. Comment phải nằm trên **dòng riêng**.
+**Biến có giá trị mặc định hợp lý — chỉ cần đổi nếu muốn tuỳ biến:**
 
-**Các biến sau KHÔNG có code đọc → có thể xoá hoặc bỏ trống:**
-- `CLOUDINARY_*` — repo BE chưa có code Cloudinary
-- `PAYMENT_GATEWAY_*` — repo BE chưa có code payment gateway
-- `WS_ENDPOINT` — không có chỗ nào đọc biến này
+| Biến | Mặc định trong `.env.example` | Ghi chú |
+|---|---|---|
+| `SPRING_PROFILES_ACTIVE` | `prod` | Bắt buộc — nạp `application-prod.yaml` |
+| `REDIS_HOST` | `redis` | Tên service trong Docker network, **không đổi** |
+| `REDIS_PORT` | `6379` | |
+| `DB_POOL_MAX_SIZE` | `20` | `application-prod.yaml` default là `30` |
+| `DB_POOL_MIN_IDLE` | `5` | `application-prod.yaml` default là `10` |
+| `JWT_EXPIRATION_MS` | `3600000` | 1 giờ |
+| `JWT_REFRESH_EXPIRATION_MS` | `604800000` | 7 ngày |
+| `JAVA_OPTS` | `-Xmx1024m -Xms512m -XX:+UseG1GC` | Nhớ chỉnh `-Xmx` nếu VPS RAM nhỏ |
+| `TZ` | `Asia/Ho_Chi_Minh` | |
 
-> ⚠️ **Lưu ý về CORS:** `CORS_ALLOWED_ORIGINS` hiện **CHƯA** được backend đọc — code đọc property `cors.allowed-origins` (`CorsConfig.java`) mà `application-prod.yaml` chưa map biến môi trường này vào. Vì FE và BE cùng origin qua Nginx nên vẫn chạy bình thường. Xem [§10 Troubleshooting](#10-troubleshooting) nếu cần bật CORS.
+> ⚠️ **KHÔNG viết comment inline sau dấu `=`** trong `.env`. Ví dụ `JWT_EXPIRATION_MS=3600000  # 1 giờ` sẽ khiến giá trị bị đọc thành chuỗi có khoảng trắng. Comment phải nằm trên **dòng riêng**. (Lưu ý: `.env.example` hiện đang đặt comment "1 giờ" / "7 ngày" ở dòng kế tiếp — đúng quy tắc.)
+
+**Các biến sau KHÔNG có code BE đọc → backend sẽ BỎ QUA, có thể để trống:**
+- `WS_ENDPOINT` — endpoint hard-code `/ws` trong `WebSocketConfig.java`, không đọc biến môi trường
+- `PAYMENT_GATEWAY_API_KEY` / `PAYMENT_GATEWAY_SECRET` — repo BE chưa có code payment gateway
+- `CLOUDINARY_*` — `application-prod.yaml` **có** khai báo property `cloudinary.*` (mặc định rỗng) nhưng repo BE chưa có class Java nào đọc chúng
+
+> ✅ **CORS đã được map đầy đủ.** `application-prod.yaml` khai báo:
+> ```yaml
+> cors:
+>   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+> ```
+> → `CORS_ALLOWED_ORIGINS` **có tác dụng**. Vì FE và BE cùng origin qua Nginx nên bình thường không cần CORS, nhưng nếu test FE ở `localhost:3000` gọi thẳng backend thì phải khai báo origin đó.
+>
+> ⚠️ Nhớ **restart backend** sau khi đổi biến này: `docker compose up -d --force-recreate backend`
 
 ---
 
@@ -426,13 +466,18 @@ networks:
 
 ### 10.1 Backend build fail: `gradle.properties: not found`
 
-```bash
-# Nguyên nhân: backend.Dockerfile có dòng COPY gradle.properties
-# nhưng repo BE hiện KHÔNG có file này → build fail ngay.
-cd /opt/flash-sale/flash-sale-b2c-UTC2
-touch gradle.properties
-# hoặc sửa Dockerfile: bỏ gradle.properties khỏi dòng COPY
-```
+> ✅ **Đã xử lý.** `docker/backend.Dockerfile` dùng `COPY --optional gradle.properties ./` → build vẫn chạy được cả khi repo BE có hoặc không có file này (hiện repo BE **vẫn chưa có**).
+>
+> Nếu bạn gặp lỗi này, khả năng cao là đang build bằng **image cũ** hoặc Dockerfile ở bản cũ. Kiểm tra:
+> ```bash
+> grep -- "--optional gradle.properties" /opt/flash-sale/deploy-b2c-utc2/docker/backend.Dockerfile
+> cd /opt/flash-sale/deploy-b2c-utc2 && git pull
+> ```
+>
+> Cách xử lý nhanh nếu chưa cập nhật Dockerfile:
+> ```bash
+> cd /opt/flash-sale/flash-sale-b2c-UTC2 && touch gradle.properties
+> ```
 
 ### 10.2 Frontend trang trắng / gọi `localhost:8080`
 
@@ -453,7 +498,7 @@ docker build -t flash-sale-b2c-frontend:latest \
 cd /opt/flash-sale/deploy-b2c-utc2 && docker compose up -d --no-deps frontend
 ```
 
-### 10.3 Backend không healthy → `/actuator/health` trả 404
+### 10.3 Backend không healthy → `/actuator/health` trả 404 hoặc 401
 
 ```bash
 cd /opt/flash-sale/deploy-b2c-utc2
@@ -465,26 +510,20 @@ docker compose logs backend | tail -50
 docker exec flash-sale-b2c-backend wget -qO- http://localhost:8080/actuator/health
 ```
 
-> ⚠️ **Hiện tại repo BE CHƯA có `spring-boot-starter-actuator`** trong `build.gradle` và `application-prod.yaml` chưa có mục `management:`.
-> Nếu đúng vậy, `/actuator/health` sẽ trả **404** → Docker healthcheck fail → backend bị đánh dấu unhealthy → `nginx` không start.
+> ✅ **Repo BE ĐÃ có actuator** (`build.gradle`: `spring-boot-starter-actuator`) và `application-prod.yaml` **đã có** mục `management:` expose `health,info`. `SecurityConfig.java` cũng đã `permitAll()` cho `/actuator/health` và `/actuator/info`.
 >
-> **Cách sửa (cần thêm vào repo BE, commit lại):**
-> ```groovy
-> // build.gradle
-> implementation 'org.springframework.boot:spring-boot-starter-actuator'
-> ```
-> ```yaml
-> # application-prod.yaml
-> management:
->   endpoints:
->     web:
->       exposure:
->         include: health,info
->   endpoint:
->     health:
->       show-details: never
-> ```
-> Hoặc **tạm thời bỏ qua** bằng cách đổi healthcheck trong `docker-compose.yml`:
+> Vì vậy nếu `/actuator/health` vẫn lỗi thì **không phải thiếu dependency** — hãy kiểm tra theo thứ tự:
+
+| Mã trả về | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| `404` | Đang chạy **image cũ**, chưa rebuild sau khi thêm actuator | `docker build` lại backend rồi `docker compose up -d --no-deps backend` |
+| `404` | Profile không phải `prod` → không nạp `application-prod.yaml` | Kiểm tra `SPRING_PROFILES_ACTIVE=prod` trong `.env` |
+| `401` | Security chặn — image build từ commit cũ (chưa có `permitAll`) | Rebuild image từ branch `dev` mới nhất |
+| `503` | Actuator trả về `DOWN` — DB hoặc Redis chưa kết nối được | Xem log backend, kiểm tra `DB_*` / `REDIS_*` |
+
+> 💡 `management.health.db.enabled: true` và `management.health.redis.enabled: true` trong `application-prod.yaml` → actuator sẽ báo `DOWN` nếu **một trong hai** kết nối lỗi. Dùng `show-details: never` nên response chỉ có `{"status":"DOWN"}`, phải xem log mới biết thành phần nào lỗi.
+
+> **Tạm thời bỏ qua actuator** bằng cách đổi healthcheck trong `docker-compose.yml`:
 > ```yaml
 > backend:
 >   healthcheck:
@@ -531,13 +570,14 @@ docker compose logs backend | grep -i "connection\|ssl\|error"
 - `"password authentication failed"` → sai `DB_USERNAME` / `DB_PASSWORD`
 - `"SSL error"` → thiếu `sslmode=require`
 
-> ⚠️ **Cần xác nhận:** `application-prod.yaml` hiện khai báo
-> `url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}` — **không có `?sslmode=require`**.
-> Nếu Supabase bắt buộc SSL, cần thêm vào repo BE:
+> ✅ **`sslmode=require` đã có sẵn.** `application-prod.yaml` khai báo:
 > ```yaml
-> url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require
+> url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:flash_sale_db}?sslmode=require
 > ```
-> (profile `local` đã có `?sslmode=require` — xem `application-local.yaml`.)
+>
+> ⚠️ **Nếu gặp lỗi SSL dù Supabase Connection Pooler (port 6543)**: pooler chặn SSL ở chế độ transaction. Khi đó đổi `DB_PORT` trong `.env` sang `5432` (direct connection) — không sửa code.
+>
+> ⚠️ Nếu Supabase bắt buộc mã hóa mạnh hơn (ví dụ IP allowlist trong dashboard), cần thêm `&sslrootcert=...` — trường hợp này phải sửa ở repo BE.
 
 ### 10.6 Redis không hoạt động
 
@@ -566,11 +606,28 @@ cd /opt/flash-sale/deploy-b2c-utc2
 grep CORS_ALLOWED_ORIGINS .env
 ```
 
-> ⚠️ Backend hiện đọc property `cors.allowed-origins` (`CorsConfig.java`), nhưng `application-prod.yaml` chưa map biến môi trường này. Nếu cần bật CORS, thêm vào `application-prod.yaml`:
+> ✅ **CORS đã được map đầy đủ** — `application-prod.yaml` có:
 > ```yaml
 > cors:
 >   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
 > ```
+> Nếu vẫn bị chặn, kiểm tra theo thứ tự:
+>
+> 1. **Biến có được truyền vào container không** — sau khi sửa `.env` phải recreate, không dùng `restart`:
+>    ```bash
+>    cd /opt/flash-sale/deploy-b2c-utc2
+>    docker compose up -d --force-recreate backend
+>    docker compose exec backend printenv CORS_ALLOWED_ORIGINS
+>    ```
+> 2. **Giá trị có đúng format không** — phải là danh sách origin đầy đủ, phân tách bằng dấu phẩy, **không có dấu `/` cuối**:
+>    ```
+>    Đúng:  CORS_ALLOWED_ORIGINS=http://172.20.10.5
+>    Sai:   CORS_ALLOWED_ORIGINS=http://172.20.10.5:80/    ← có dấu /
+>    Sai:   CORS_ALLOWED_ORIGINS=http://172.20.10.5:80,     ← dấu phẩy cuối
+>    ```
+> 3. **Nếu không đổi gì được** — kiểm tra origin thực tế FE gửi lên. Mở DevTools → Network → filter `api` → cột `Origin`. Giá trị này phải nằm trong `CORS_ALLOWED_ORIGINS`.
+>
+> 💡 Thông thường khi deploy qua Nginx 1 origin thì **không cần CORS** (same-origin). CORS chỉ cần khi: test FE ở `localhost:3000` gọi thẳng `:8080`, hoặc tách FE/BE qua domain khác nhau.
 
 ### 10.8 WebSocket realtime không hoạt động
 

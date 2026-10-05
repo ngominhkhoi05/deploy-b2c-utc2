@@ -5,8 +5,8 @@
 #
 # Build:
 #   docker build -t flash-sale-b2c-backend:latest \
-#       -f /opt/deploy-b2c-utc2/docker/backend.Dockerfile \
-#       /opt/flash-sale-b2c-UTC2/
+#       -f /opt/flash-sale/deploy-b2c-utc2/docker/backend.Dockerfile \
+#       /opt/flash-sale/flash-sale-b2c-UTC2/
 #
 # Stage 1: Build bootJar với JDK 25 (Temurin).
 # Stage 2: Runtime image với JRE 25, user non-root.

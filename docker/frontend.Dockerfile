@@ -5,7 +5,7 @@
 #
 # Build:
 #   docker build -t flash-sale-b2c-frontend:latest \
-#       -f /opt/deploy-b2c-utc2/docker/frontend.Dockerfile \
+#       -f /opt/flash-sale/deploy-b2c-utc2/docker/frontend.Dockerfile \
 #       /opt/flash-sale-b2c/
 #
 # ARCHITECTURE:

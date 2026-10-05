@@ -357,8 +357,18 @@ chmod +x scripts/*.sh
 
 Script sẽ:
 1. Kiểm tra `.env` và `redis.env` tồn tại
-2. Tạo Docker network `flash-sale-net`
-3. Khởi động 4 containers: `redis`, `backend`, `frontend`, `nginx`
+2. Khởi động 4 containers: `redis`, `backend`, `frontend`, `nginx` (Compose tự tạo network `flash-sale-net`)
+3. Kiểm tra đủ 4 container đang chạy, nếu thiếu sẽ báo lỗi và exit 1
+
+> ⚠️ **Không tạo network thủ công.** Nếu bạn từng chạy `docker network create flash-sale-net`, network đó thiếu label `com.docker.compose.*` và Compose sẽ abort với lỗi:
+> ```
+> network flash-sale-net was found but has incorrect label com.docker.compose.network
+> ```
+> Cách sửa:
+> ```bash
+> docker network rm flash-sale-net
+> ./scripts/deploy.sh
+> ```
 
 **Kiểm tra trạng thái:**
 ```bash

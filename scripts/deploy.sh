@@ -33,6 +33,13 @@ if [ ! -f ".env" ]; then
     exit 1
 fi
 
+# ─── 1b. Kiểm tra file redis.env ────────────────────────────────────────
+if [ ! -f "redis.env" ]; then
+    echo "❌ Chưa có file redis.env. Hãy copy từ redis.env.example:"
+    echo "    cp redis.env.example redis.env && nano redis.env"
+    exit 1
+fi
+
 # ─── 2. Tạo Docker network nếu chưa có ─────────────────────────────────
 if ! docker network inspect flash-sale-net >/dev/null 2>&1; then
     echo "==> Tạo Docker network 'flash-sale-net'..."

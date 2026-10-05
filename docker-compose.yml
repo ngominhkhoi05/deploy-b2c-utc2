@@ -23,16 +23,15 @@ services:
     container_name: flash-sale-b2c-redis
     restart: unless-stopped
     env_file:
-      # Đọc REDIS_PASSWORD (nếu có) từ .env để set requirepass.
-      # REDIS_HOST/PORT_REDIS KHÔNG được dùng cho container này — nó đã
-      # biết nó là Redis server.
-      - .env
+      # CHỈ đọc redis.env (chứa REDIS_PASSWORD) — KHÔNG đọc .env chung
+      # để tránh lộ DB password / JWT secret vào container Redis.
+      - redis.env
     command: >
       sh -c "
         if [ -n \"$$REDIS_PASSWORD\" ]; then
-          exec redis-server --requirepass \"$$REDIS_PASSWORD\"
+          exec redis-server --requirepass \"$$REDIS_PASSWORD\" --maxmemory 256mb --maxmemory-policy allkeys-lru
         else
-          exec redis-server
+          exec redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
         fi
       "
     volumes:
@@ -63,7 +62,8 @@ services:
       REDIS_PORT: 6379
       # DB_HOST giữ nguyên trong .env (Supabase Cloud)
       TZ: Asia/Ho_Chi_Minh
-      JAVA_OPTS: ${JAVA_OPTS:-"-Xmx1024m -Xms512m -XX:+UseG1GC"}
+      # JAVA_OPTS đã có sẵn trong .env.example. Nếu .env thiếu, dùng default.
+      JAVA_OPTS: ${JAVA_OPTS:--Xmx1024m -Xms512m -XX:+UseG1GC}
     ports:
       # Bind localhost:8080, KHÔNG public ra ngoài.
       # Nginx sẽ proxy /api → backend:8080.
@@ -88,6 +88,8 @@ services:
         condition: service_healthy
       frontend:
         condition: service_healthy
+    environment:
+      TZ: Asia/Ho_Chi_Minh
     ports:
       # Port 80 - truy cập http://<VPS_IP>
       - "80:80"

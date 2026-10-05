@@ -36,7 +36,11 @@ FROM eclipse-temurin:25-jre-jammy
 
 # Tạo non-root user để chạy app
 RUN groupadd --system app && \
-    useradd --system --gid app --create-home --home-dir /app appuser
+    useradd --system --gid app --create-home --home-dir /app --shell /sbin/nologin appuser
+
+# Tạo thư mục /tmp cho Java với quyền ghi
+# (một số thư viện ghi file tạm vào /tmp như Font cache, OkHttp, ...)
+RUN mkdir -p /tmp && chmod 1777 /tmp
 
 USER appuser
 WORKDIR /app

@@ -47,7 +47,10 @@ RUN addgroup -S app && adduser -S app -G app
 
 WORKDIR /app
 
-# Copy build output + node_modules production-only
+# Copy build output + production dependencies only.
+# LƯU Ý: Copy toàn bộ node_modules (~300MB) — trade-off giữa đơn giản và
+# image size. Để tối ưu, thêm `output: 'standalone'` vào next.config.ts
+# rồi dùng COPY .next/standalone + .next/static + public.
 COPY --from=builder --chown=app:app /build/.next ./.next
 COPY --from=builder --chown=app:app /build/public ./public
 COPY --from=builder --chown=app:app /build/package.json ./package.json

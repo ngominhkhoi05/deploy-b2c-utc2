@@ -10,6 +10,7 @@
 .env.*
 !.env.example
 db.env
+redis.env
 *.env.local
 *.env.production
 *.env.staging

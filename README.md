@@ -64,18 +64,18 @@ Vì server sẽ deploy **nhiều dự án**, tất cả dùng chung tiền tố 
 
 ```
 /opt/flash-sale/
-├── be/         # Repo backend  (flash-sale-b2c-UTC2)  — Spring Boot / Java 25
-├── fe/         # Repo frontend (flash-sale-b2c)      — Next.js
-└── deploy/     # Repo deploy    (deploy-b2c-utc2)    — compose + nginx + scripts
+├── be/         # Repo backend  (NgocHiep-Nguyen/flash-sale-b2c-UTC2) — Spring Boot / Java 25
+├── fe/         # Repo frontend (ngominhkhoi05/flash-sale-b2c)         — Next.js
+└── deploy/     # Repo deploy    (ngominhkhoi05/deploy-b2c-utc2)       — compose + nginx + scripts
 ```
 
 **Lưu ý đặt tên:** thư mục trên VPS là `be/`, `fe/`, `deploy/` cho gọn, nhưng tên repo local vẫn là:
 
-| Thư mục trên VPS | Repo local (Windows) |
-|---|---|
-| `/opt/flash-sale/be/` | `D:\flash-sale-b2c-UTC2` |
-| `/opt/flash-sale/fe/` | `D:\flash-sale-b2c` |
-| `/opt/flash-sale/deploy/` | `D:\deploy-b2c-utc2` |
+| Thư mục trên VPS | Repo local (Windows) | GitHub |
+|---|---|---|
+| `/opt/flash-sale/be/` | `D:\flash-sale-b2c-UTC2` | `NgocHiep-Nguyen/flash-sale-b2c-UTC2` |
+| `/opt/flash-sale/fe/` | `D:\flash-sale-b2c` | `ngominhkhoi05/flash-sale-b2c` |
+| `/opt/flash-sale/deploy/` | `D:\deploy-b2c-utc2` | `ngominhkhoi05/deploy-b2c-utc2` |
 
 ---
 
@@ -199,9 +199,9 @@ mv deploy_tmp deploy
 cd /opt/flash-sale
 rm -rf be fe deploy
 
-git clone <BE_REPO_URL>     be
-git clone <FE_REPO_URL>     fe
-git clone <DEPLOY_REPO_URL> deploy
+git clone https://github.com/NgocHiep-Nguyen/flash-sale-b2c-UTC2.git be
+git clone https://github.com/ngominhkhoi05/flash-sale-b2c.git         fe
+git clone https://github.com/ngominhkhoi05/deploy-b2c-utc2.git       deploy
 ```
 
 **Trên Windows (để có repo local để sửa code):**

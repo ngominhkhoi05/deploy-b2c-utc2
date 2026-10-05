@@ -29,9 +29,21 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 
 # Build arg: API base URL mà FE sẽ gọi.
-# Mặc định: relative path /api/v1 — Nginx proxy /api → backend.
-ARG NEXT_PUBLIC_API_BASE_URL=/api/v1
-ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+#
+# ⚠️ TÊN BIẾN PHẢI KHỚP CODE: lib/api/client.ts đọc
+#    process.env.NEXT_PUBLIC_API_BASE (KHÔNG phải ..._BASE_URL).
+#    Nếu sai tên, Next.js sẽ inline undefined vào bundle → FE fallback
+#    về http://localhost:8080/api/v1 → trang trắng trên trình duyệt user.
+#
+# Build:
+#   docker build --build-arg NEXT_PUBLIC_API_BASE=/api/v1 \
+#       -f docker/frontend.Dockerfile .
+ARG NEXT_PUBLIC_API_BASE=/api/v1
+ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
+
+# Base URL cho WebSocket (SockJS). Qua Nginx reverse proxy ở port 80.
+ARG NEXT_PUBLIC_WS_BASE=
+ENV NEXT_PUBLIC_WS_BASE=$NEXT_PUBLIC_WS_BASE
 
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build

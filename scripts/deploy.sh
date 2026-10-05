@@ -66,6 +66,6 @@ echo "  • Xem log FE:     docker compose logs -f frontend"
 echo "  • Xem log Nginx:  docker compose logs -f nginx"
 echo "  • Health check:   ./scripts/check-health.sh"
 echo ""
-VPS_IP=$(grep '^VPS_IP=' .env | cut -d= -f2)
+VPS_IP=$(grep '^VPS_IP=' .env | cut -d= -f2-)
 echo "  • Truy cập:       http://${VPS_IP}"
 echo "  • Swagger UI:     http://${VPS_IP}/swagger-ui.html"

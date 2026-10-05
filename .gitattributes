@@ -1,0 +1,23 @@
+# Shell scripts: LF bat buoc (docker-compose chay bang bash tren Ubuntu)
+*.sh text eol=lf
+
+# Dockerfile: LF bat buoc
+*.Dockerfile text eol=lf
+
+# YAML + nginx conf: LF
+*.yml text eol=lf
+*.yaml text eol=lf
+*.conf text eol=lf
+
+# Env example + markdown: LF
+*.env.example text eol=lf
+*.md text eol=lf
+
+# Binary: khong doi
+*.jar binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.png binary
+*.jpg binary
+*.ico binary

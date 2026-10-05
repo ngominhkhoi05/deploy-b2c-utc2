@@ -11,8 +11,11 @@ DEPLOY_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$DEPLOY_DIR"
 
 # Lấy IP từ .env
-VPS_IP=$(grep '^VPS_IP=' .env | cut -d= -f2)
-REDIS_PASSWORD=$(grep '^REDIS_PASSWORD=' .env | cut -d= -f2)
+VPS_IP=$(grep '^VPS_IP=' .env | cut -d= -f2-)
+# ⚠️ REDIS_PASSWORD nằm trong redis.env (tách riêng để không lộ
+# DB password / JWT secret vào container Redis), KHÔNG phải trong .env.
+# Dùng cut -d= -f2- để giữ nguyên dấu = nếu password có chứa ký tự đặc biệt.
+REDIS_PASSWORD=$(grep '^REDIS_PASSWORD=' redis.env 2>/dev/null | cut -d= -f2-)
 
 # Lệnh redis-cli có/không password
 if [ -n "$REDIS_PASSWORD" ]; then

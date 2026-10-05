@@ -17,9 +17,13 @@ FROM eclipse-temurin:25-jdk-jammy AS builder
 WORKDIR /build
 
 # Copy Gradle config
-COPY gradlew settings.gradle gradle.properties ./
+#
+# ⚠️ gradle.properties KHÔNG tồn tại trong repo hiện tại.
+# Dùng COPY --optional nên build vẫn chạy được cả khi file có/không.
+COPY gradlew settings.gradle ./
 COPY gradle ./gradle
 COPY build.gradle ./
+COPY --optional gradle.properties ./
 
 # Copy source code
 COPY src ./src

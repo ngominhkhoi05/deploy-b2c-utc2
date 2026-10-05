@@ -597,7 +597,7 @@ docker compose logs backend | tail -50      # ← xem lỗi thật ở đây
 1. `/actuator/health` 404 (thiếu actuator) → xem [§10.3](#103-backend-không-healthy--actuatorhealth-trả-404)
 2. DB connect fail (Supabase cần `sslmode=require`)
 3. `JWT_SECRET` rỗng hoặc < 32 ký tự → `JwtProperties.validate()` throw → app không start
-4. Redis không kết nối được
+4. Redis không kết nối được (xem [§10.6b](#106b-dependency-failed-to-start-container-flash-sale-b2c-redis-is-unhealthy))
 
 **Bypass để xem log backend:**
 ```bash
@@ -646,6 +646,34 @@ redis-cli ping
 > ```bash
 > REDIS_PASSWORD=$(grep '^REDIS_PASSWORD=' redis.env | cut -d= -f2-)
 > ```
+
+### 10.6b `dependency failed to start: container flash-sale-b2c-redis is unhealthy`
+
+**Nguyên nhân (đã xảy ra và đã được sửa):**
+
+1. **Healthcheck không truyền password.** Healthcheck cũ là:
+   ```yaml
+   test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+   ```
+   Khi Redis chạy `--requirepass`, lệnh trả về `NOAUTH Authentication required.` — và **vẫn exit 0** — nên `grep -q PONG` không match → container bị đánh dấu `unhealthy`. Vì `backend` có `depends_on: redis: condition: service_healthy` nên backend không khởi động được, kéo theo nginx.
+
+2. **`command` mất dấu nháy.** Dòng `exec redis-server --requirepass \"$$REDIS_PASSWORD\"` dùng escaped quotes (`\"`). Docker Compose **strip** những dấu này khi dựng command, thành `redis-server --requirepass $REDIS_PASSWORD`. Khi `REDIS_PASSWORD` rỗng thì Redis nhận `--requirepass` không có đối số → `FATAL CONFIG FILE ERROR: wrong number of arguments`, container exit code 1.
+
+**Đã sửa trong `docker-compose.yml`:**
+- Healthcheck dùng `$${REDIS_PASSWORD:+-a "$$REDIS_PASSWORD" --no-auth-warning}` — chỉ thêm `-a` khi password khác rỗng
+- `command` bỏ escaped quotes, dùng `>-` với dấu nháy đơn bao ngoài
+
+> 💡 Vì sao escape thành `$$`? Docker Compose tự interpolate `${...}` khi đọc file compose. Không escape thì `${REDIS_PASSWORD:+...}` bị Compose thay bằng chuỗi rỗng **trước khi** container khởi động, nên healthcheck mất hết tham số `-a`.
+
+**Đã test:** cả 3 trường hợp đều `healthy` — password đơn giản, password có ký tự đặc biệt (`$`, space, `&`), và không có password.
+
+**Nếu vẫn gặp lỗi:**
+```bash
+cd /opt/flash-sale/deploy-b2c-utc2
+git pull
+docker compose up -d --force-recreate redis
+docker compose ps
+```
 
 ### 10.7 CORS bị chặn khi FE gọi API
 

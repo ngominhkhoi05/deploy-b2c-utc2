@@ -26,19 +26,36 @@ services:
       # CHỈ đọc redis.env (chứa REDIS_PASSWORD) — KHÔNG đọc .env chung
       # để tránh lộ DB password / JWT secret vào container Redis.
       - redis.env
-    command: >
-      sh -c "
-        if [ -n \"$$REDIS_PASSWORD\" ]; then
-          exec redis-server --requirepass \"$$REDIS_PASSWORD\" --maxmemory 256mb --maxmemory-policy allkeys-lru
-        else
-          exec redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
-        fi
-      "
+    # Dùng ${VAR:+...} để chỉ thêm --requirepass khi REDIS_PASSWORD khác rỗng.
+    # ⚠️ Cần escape thành $${...} vì Docker Compose tự interpolate ${...}
+    #    trước khi container khởi động — không escape thì biến bị thay rỗng.
+    # ⚠️ KHÔNG dùng escaped quotes (\") ở đây: Compose sẽ strip chúng, khiến
+    #    "redis-server --requirepass $REDIS_PASSWORD" mất dấu nháy và Redis báo
+    #    "wrong number of arguments" khi password rỗng.
+    command: >-
+      sh -c 'if [ -n "$${REDIS_PASSWORD}" ]; then
+        exec redis-server --requirepass "$$REDIS_PASSWORD"
+        --maxmemory 256mb --maxmemory-policy allkeys-lru;
+      else
+        exec redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru;
+      fi'
     volumes:
       # Persistent data Redis — tồn tại qua các lần `docker compose down`
       - redis-data:/data
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      # ⚠️ Phải truyền password khi Redis chạy --requirepass.
+      # redis-cli ping KHÔNG có auth sẽ trả về "NOAUTH Authentication
+      # required." (nhưng vẫn exit 0), nên `grep -q PONG` fail →
+      # container bị đánh dấu unhealthy → backend không khởi động được
+      # (depends_on: condition: service_healthy).
+      # REDIS_PASSWORD lấy từ redis.env (đã có trong env_file ở trên).
+      test:
+        - CMD-SHELL
+        - >-
+          redis-cli
+          $${REDIS_PASSWORD:+-a "$$REDIS_PASSWORD" --no-auth-warning}
+          ping
+          | grep -q PONG
       interval: 10s
       timeout: 5s
       retries: 5

@@ -19,13 +19,18 @@ WORKDIR /build
 # Copy Gradle config
 #
 # ⚠️ gradle.properties KHÔNG tồn tại trong repo hiện tại.
-# Dùng COPY --optional nên build vẫn chạy được cả khi file có/không.
-COPY gradlew settings.gradle ./
-COPY gradle ./gradle
-COPY build.gradle ./
-COPY --optional gradle.properties ./
+# Docker KHÔNG có flag "COPY --optional" (đã thử 1.7-labs và 1.18-labs —
+# cả hai đều báo "unknown flag: --optional"). COPY một file không tồn tại
+# sẽ fail ngay, nên không thể copy thẳng file này.
+#
+# Cách dùng ở đây: COPY thư mục gốc (chứa cả .gitignore, README...) rồi
+# XÓA file trong cùng một RUN. `rm -f` không fail khi file vắng mặt.
+# Tách "copy config" và "copy src" thành 2 lần COPY để cache đổi .java
+# không làm mất layer config.
+COPY . ./
+RUN rm -f ./gradle.properties
 
-# Copy source code
+# Copy source code (ghi đè lên bản config đã copy ở trên)
 COPY src ./src
 
 # Cache gradle wrapper + dependencies

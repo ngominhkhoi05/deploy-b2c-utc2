@@ -15,11 +15,11 @@
 > - ✅ `SecurityConfig.java` đã `permitAll()` cho `/actuator/health` và `/actuator/info`
 > - ✅ `?sslmode=require` đã có trong `application-prod.yaml` (profile `prod`)
 > - ✅ `cors.allowed-origins` đã map từ biến môi trường `CORS_ALLOWED_ORIGINS`
-> - ✅ `docker/backend.Dockerfile` dùng `COPY --optional gradle.properties` → build không còn fail khi thiếu file
+> - ✅ `docker/backend.Dockerfile` xử lý thiếu `gradle.properties` bằng `COPY . ./` + `RUN rm -f` → build thành công dù repo BE chưa có file này
 >
 > **Chưa có code BE đọc** (biến `.env` bị bỏ qua): `WS_ENDPOINT`, `PAYMENT_GATEWAY_*`, `CLOUDINARY_*`
 >
-> **Còn tồn tại:** repo BE chưa có file `gradle.properties` (không ảnh hưởng build nhờ `--optional`).
+> **Còn tồn tại:** repo BE chưa có file `gradle.properties` — không ảnh hưởng build (Dockerfile đã xử lý).
 >
 > ⚠️ Khi có thay đổi mới ở repo BE, cập nhật lại mục này.
 
@@ -464,20 +464,30 @@ networks:
 
 ## 10. Troubleshooting
 
-### 10.1 Backend build fail: `gradle.properties: not found`
+### 10.1 Backend build fail: `unknown flag: --optional`
 
-> ✅ **Đã xử lý.** `docker/backend.Dockerfile` dùng `COPY --optional gradle.properties ./` → build vẫn chạy được cả khi repo BE có hoặc không có file này (hiện repo BE **vẫn chưa có**).
+```
+dockerfile parse error on line 26: unknown flag: --optional
+```
+
+> ⚠️ **Lỗi này đã xảy ra và đã được sửa.** Bản `deploy-b2c-utc2` cũ (trước commit sửa lỗi) dùng `COPY --optional gradle.properties ./` — nhưng **Docker KHÔNG có flag `--optional`** cho `COPY`.
 >
-> Nếu bạn gặp lỗi này, khả năng cao là đang build bằng **image cũ** hoặc Dockerfile ở bản cũ. Kiểm tra:
+> **Cách sửa trên VPS:**
 > ```bash
-> grep -- "--optional gradle.properties" /opt/flash-sale/deploy-b2c-utc2/docker/backend.Dockerfile
 > cd /opt/flash-sale/deploy-b2c-utc2 && git pull
 > ```
+> rồi build lại (§5.1). Docker đã được sửa thành:
+> ```dockerfile
+> COPY . ./
+> RUN rm -f ./gradle.properties
+> ```
+> → copy cả build context rồi xoá file trong cùng một layer. `rm -f` không fail khi file vắng mặt.
 >
-> Cách xử lý nhanh nếu chưa cập nhật Dockerfile:
+> **Cách xử lý tạm thời nếu chưa `git pull` được:**
 > ```bash
 > cd /opt/flash-sale/flash-sale-b2c-UTC2 && touch gradle.properties
 > ```
+> (rỗng cũng được — chỉ cần để `COPY` không báo thiếu file)
 
 ### 10.2 Frontend trang trắng / gọi `localhost:8080`
 

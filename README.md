@@ -8,7 +8,7 @@
 
 ## Trạng thái tài liệu
 
-> 📅 **Cập nhật: 05/10/2026** — đồng bộ với code BE branch `dev` (commit `8933200`).
+> 📅 **Cập nhật: 10/10/2026** — Đổi repo frontend sang `trangkimdat2005/flash-sale-b2c-fe` (owner mới). Đồng bộ Dockerfile dùng đúng tên biến môi trường mà FE mới đang đọc (`NEXT_PUBLIC_API_URL` + `NEXT_PUBLIC_WS_URL`).
 >
 > **Đã xử lý các lỗi từng gây deploy fail:**
 > - ✅ Actuator đã có trong `build.gradle` + `application-prod.yaml` đã có mục `management:` → `/actuator/health` hoạt động
@@ -83,9 +83,9 @@ Vì server sẽ deploy **nhiều dự án**, tất cả dùng chung tiền tố 
 
 ```
 /opt/flash-sale/
-├── flash-sale-b2c-UTC2/   # Repo backend  (NgocHiep-Nguyen/...) — Spring Boot / Java 25
-├── flash-sale-b2c/        # Repo frontend (ngominhkhoi05/...)   — Next.js
-└── deploy-b2c-utc2/       # Repo deploy    (ngominhkhoi05/...)   — compose + nginx + scripts
+├── flash-sale-b2c-UTC2/   # Repo backend  (NgocHiep-Nguyen/...)       — Spring Boot / Java 25
+├── flash-sale-b2c-fe/     # Repo frontend (trangkimdat2005/...)      — Next.js
+└── deploy-b2c-utc2/       # Repo deploy    (ngominhkhoi05/...)       — compose + nginx + scripts
 ```
 
 **Lưu ý đặt tên:** thư mục trên VPS trùng **đúng tên repo** để tránh nhầm khi debug. Tên repo local trên Windows cũng vậy — chỉ khác ở chữ hoa/thường và dấu gạch chéo.
@@ -93,8 +93,10 @@ Vì server sẽ deploy **nhiều dự án**, tất cả dùng chung tiền tố 
 | Thư mục trên VPS | Repo local (Windows) | GitHub |
 |---|---|---|
 | `/opt/flash-sale/flash-sale-b2c-UTC2/` | `D:\flash-sale-b2c-UTC2` | `NgocHiep-Nguyen/flash-sale-b2c-UTC2` |
-| `/opt/flash-sale/flash-sale-b2c/` | `D:\flash-sale-b2c` | `ngominhkhoi05/flash-sale-b2c` |
-| `/opt/flash-sale/deploy-b2c-utc2/` | `D:\deploy-b2c-utc2` | `ngominhkhoi05/deploy-b2c-utc2` |
+| `/opt/flash-sale/flash-sale-b2c-fe/`   | `D:\flash-sale-b2c-fe`   | `trangkimdat2005/flash-sale-b2c-fe` |
+| `/opt/flash-sale/deploy-b2c-utc2/`    | `D:\deploy-b2c-utc2`     | `ngominhkhoi05/deploy-b2c-utc2` |
+
+> **Repo frontend cũ `flash-sale-b2c/` (owner `ngominhkhoi05`)** đã ngừng dùng từ 2026-10-10. Sau khi chuyển sang repo mới, chạy `scripts/remove-old-frontend.sh` để dọn folder + Docker image cũ.
 
 ---
 
@@ -190,23 +192,23 @@ ufw enable
 ```bash
 # Trên Windows PowerShell
 scp -r D:\flash-sale-b2c-UTC2 root@<VPS_IP>:/opt/flash-sale/flash-sale-b2c-UTC2_tmp
-scp -r D:\flash-sale-b2c     root@<VPS_IP>:/opt/flash-sale/flash-sale-b2c_tmp
+scp -r D:\flash-sale-b2c-fe   root@<VPS_IP>:/opt/flash-sale/flash-sale-b2c-fe_tmp
 scp -r D:\deploy-b2c-utc2    root@<VPS_IP>:/opt/flash-sale/deploy-b2c-utc2_tmp
 ```
 
 **Trên VPS (đổi tên về tên chuẩn):**
 ```bash
 cd /opt/flash-sale
-rm -rf flash-sale-b2c-UTC2 flash-sale-b2c deploy-b2c-utc2
+rm -rf flash-sale-b2c-UTC2 flash-sale-b2c-fe deploy-b2c-utc2
 mv flash-sale-b2c-UTC2_tmp flash-sale-b2c-UTC2
-mv flash-sale-b2c_tmp      flash-sale-b2c
+mv flash-sale-b2c-fe_tmp   flash-sale-b2c-fe
 mv deploy-b2c-utc2_tmp    deploy-b2c-utc2
 ```
 
 > ⚠️ `scp -r` chuyển cả `node_modules/` (FE) và `build/` + `.gradle/` (BE) → **rất chậm** (hàng trăm MB). Có thể loại trước:
 > ```powershell
 > # Windows PowerShell — tạo bản sạch trước khi scp
-> robocopy D:\flash-sale-b2c      D:\tmp\flash-sale-b2c      /E /XD node_modules .next .git
+> robocopy D:\flash-sale-b2c-fe   D:\tmp\flash-sale-b2c-fe   /E /XD node_modules .next .git
 > robocopy D:\flash-sale-b2c-UTC2 D:\tmp\flash-sale-b2c-UTC2 /E /XD build .gradle bin .git
 > robocopy D:\deploy-b2c-utc2     D:\tmp\deploy-b2c-utc2     /E /XD .git
 > ```
@@ -216,11 +218,11 @@ mv deploy-b2c-utc2_tmp    deploy-b2c-utc2
 ```bash
 # Trên VPS
 cd /opt/flash-sale
-rm -rf flash-sale-b2c-UTC2 flash-sale-b2c deploy-b2c-utc2
+rm -rf flash-sale-b2c-UTC2 flash-sale-b2c-fe deploy-b2c-utc2
 
 git clone https://github.com/NgocHiep-Nguyen/flash-sale-b2c-UTC2.git flash-sale-b2c-UTC2
-git clone https://github.com/ngominhkhoi05/flash-sale-b2c.git         flash-sale-b2c
-git clone https://github.com/ngominhkhoi05/deploy-b2c-utc2.git       deploy-b2c-utc2
+git clone https://github.com/trangkimdat2005/flash-sale-b2c-fe.git         flash-sale-b2c-fe
+git clone https://github.com/ngominhkhoi05/deploy-b2c-utc2.git             deploy-b2c-utc2
 ```
 
 **Trên Windows (để có repo local để sửa code):**
@@ -256,18 +258,24 @@ docker build -t flash-sale-b2c-backend:latest \
 ### 5.2 Build Frontend
 
 ```bash
-cd /opt/flash-sale/flash-sale-b2c
+cd /opt/flash-sale/flash-sale-b2c-fe
 
-# BẮT BUỘC truyền build-arg NEXT_PUBLIC_API_BASE
+# BẮT BUỘC truyền build-arg NEXT_PUBLIC_API_URL.
+# Code FE (repo flash-sale-b2c-fe) đọc:
+#   - process.env.NEXT_PUBLIC_API_URL  trong src/lib/api/client.ts
+#   - process.env.NEXT_PUBLIC_WS_URL   trong src/lib/stomp.ts
+# Phải khớp tên biến trong Dockerfile (xem docker/frontend.Dockerfile).
 docker build -t flash-sale-b2c-frontend:latest \
-    --build-arg NEXT_PUBLIC_API_BASE=/api/v1 \
+    --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
+    --build-arg NEXT_PUBLIC_WS_URL= \
     -f /opt/flash-sale/deploy-b2c-utc2/docker/frontend.Dockerfile \
-    /opt/flash-sale/flash-sale-b2c/
+    /opt/flash-sale/flash-sale-b2c-fe/
 ```
 
-> ⚠️ **Bắt buộc phải truyền `--build-arg NEXT_PUBLIC_API_BASE=/api/v1`.**
-> Code FE đọc `process.env.NEXT_PUBLIC_API_BASE` (`lib/api/client.ts`) — **không phải** `NEXT_PUBLIC_API_BASE_URL` như trong `.env.example`.
-> Nếu không truyền, FE fallback về `http://localhost:8080/api/v1` → trình duyệt của người dùng gọi vào localhost của họ → trang trắng.
+> ⚠️ **Bắt buộc phải truyền `--build-arg NEXT_PUBLIC_API_URL=/api/v1`.**
+> Nếu không truyền, FE fallback về `http://localhost:8080` → trình duyệt của người dùng gọi vào localhost của họ → trang trắng.
+>
+> 💡 **Để trống `--build-arg NEXT_PUBLIC_WS_URL=`** — SockJS sẽ tự dùng `window.location.host` (cùng host với trang web) → ws://<VPS_IP>/ws tự động, không cần hard-code IP/domain.
 
 ### 5.3 Verify
 
@@ -458,17 +466,18 @@ docker compose up -d --no-deps backend
 
 ```bash
 # Local (Windows)
-cd D:\flash-sale-b2c && git add -A && git commit -m "..." && git push
+cd D:\flash-sale-b2c-fe && git add -A && git commit -m "..." && git push
 ```
 
 **Trên VPS:**
 ```bash
-cd /opt/flash-sale/flash-sale-b2c && git pull
+cd /opt/flash-sale/flash-sale-b2c-fe && git pull
 
 docker build -t flash-sale-b2c-frontend:latest \
-    --build-arg NEXT_PUBLIC_API_BASE=/api/v1 \
+    --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
+    --build-arg NEXT_PUBLIC_WS_URL= \
     -f /opt/flash-sale/deploy-b2c-utc2/docker/frontend.Dockerfile \
-    /opt/flash-sale/flash-sale-b2c/
+    /opt/flash-sale/flash-sale-b2c-fe/
 
 cd /opt/flash-sale/deploy-b2c-utc2
 docker compose up -d --no-deps frontend
@@ -537,18 +546,19 @@ dockerfile parse error on line 26: unknown flag: --optional
 ### 10.2 Frontend trang trắng / gọi `localhost:8080`
 
 ```bash
-# Nguyên nhân: build thiếu --build-arg NEXT_PUBLIC_API_BASE
+# Nguyên nhân: build thiếu --build-arg NEXT_PUBLIC_API_URL
 cd /opt/flash-sale/deploy-b2c-utc2
 docker compose logs frontend
 ```
 
 **Cách sửa:**
 ```bash
-cd /opt/flash-sale/flash-sale-b2c
+cd /opt/flash-sale/flash-sale-b2c-fe
 docker build -t flash-sale-b2c-frontend:latest \
-    --build-arg NEXT_PUBLIC_API_BASE=/api/v1 \
+    --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
+    --build-arg NEXT_PUBLIC_WS_URL= \
     -f /opt/flash-sale/deploy-b2c-utc2/docker/frontend.Dockerfile \
-    /opt/flash-sale/flash-sale-b2c/
+    /opt/flash-sale/flash-sale-b2c-fe/
 
 cd /opt/flash-sale/deploy-b2c-utc2 && docker compose up -d --no-deps frontend
 ```

@@ -30,20 +30,25 @@ COPY . .
 
 # Build arg: API base URL mà FE sẽ gọi.
 #
-# ⚠️ TÊN BIẾN PHẢI KHỚP CODE: lib/api/client.ts đọc
-#    process.env.NEXT_PUBLIC_API_BASE (KHÔNG phải ..._BASE_URL).
+# ⚠️ TÊN BIẾN PHẢI KHỚP CODE (repo flash-sale-b2c-fe):
+#    - src/lib/api/client.ts đọc process.env.NEXT_PUBLIC_API_URL
+#    - src/lib/stomp.ts    đọc process.env.NEXT_PUBLIC_WS_URL
 #    Nếu sai tên, Next.js sẽ inline undefined vào bundle → FE fallback
-#    về http://localhost:8080/api/v1 → trang trắng trên trình duyệt user.
+#    về http://localhost:8080 → trang trắng trên trình duyệt user.
 #
-# Build:
-#   docker build --build-arg NEXT_PUBLIC_API_BASE=/api/v1 \
+# Build (prod — qua Nginx reverse proxy cùng origin):
+#   docker build --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
+#       --build-arg NEXT_PUBLIC_WS_URL= \
 #       -f docker/frontend.Dockerfile .
-ARG NEXT_PUBLIC_API_BASE=/api/v1
-ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
+#
+# Lưu ý: NEXT_PUBLIC_WS_URL để TRỐNG → SockJS dùng window.location.host
+# tự dộng (ra ws://<current-host>/ws), tránh sai khi đổi domain/IP.
+ARG NEXT_PUBLIC_API_URL=
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Base URL cho WebSocket (SockJS). Qua Nginx reverse proxy ở port 80.
-ARG NEXT_PUBLIC_WS_BASE=
-ENV NEXT_PUBLIC_WS_BASE=$NEXT_PUBLIC_WS_BASE
+ARG NEXT_PUBLIC_WS_URL=
+ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
 
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build

@@ -70,12 +70,22 @@ docker build -t flash-sale-b2c-backend:latest \
 echo "    Backend image built"
 
 # ── 4. Rebuild frontend image from new repo ──────────────────────────
+# ⚠️ Tất cả biến NEXT_PUBLIC_* là BUILD-TIME trong Next.js (xem
+# deploy-b2c-utc2/.env.example PHẦN 10). Phải truyền qua --build-arg,
+# KHÔNG truyền runtime qua env_file (sẽ bị bỏ qua).
+#
+# Giá trị mặc định dưới đây khớp với .env.example PHẦN 10. Nếu muốn
+# override, sửa trực tiếp ở đây (không cần sửa .env) — vì build-arg
+# là 1-shot, không cần persist.
 echo ""
 echo "==> 4/6. Rebuild frontend image from new repo..."
 cd "$FLASH_SALE_DIR/flash-sale-b2c-fe"
 docker build -t flash-sale-b2c-frontend:latest \
     --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
     --build-arg NEXT_PUBLIC_WS_URL= \
+    --build-arg NEXT_PUBLIC_USE_MOCK=false \
+    --build-arg NEXT_PUBLIC_SITE_URL="${VPS_PUBLIC_URL:-http://<VPS_IP>}" \
+    --build-arg NEXT_PUBLIC_DEFAULT_LOCALE=vi \
     -f "$DEPLOY_DIR/docker/frontend.Dockerfile" \
     "$FLASH_SALE_DIR/flash-sale-b2c-fe/"
 echo "    Frontend image built (from new repo)"

@@ -66,6 +66,14 @@ jobs:
             cd /opt/flash-sale/deploy-b2c-utc2
             docker compose up -d --no-deps backend frontend
 
+            echo "=== [6b/6] Restart nginx to reload config (nginx/default.conf) ==="
+            # nginx/default.conf is bind-mounted from host. After `git pull`,
+            # the new file is on disk but the running nginx container still
+            # uses the old config in memory. `docker compose pull` does not
+            # recreate nginx (it uses upstream image nginx:1.27-alpine, not
+            # a local build), so we must restart it explicitly.
+            docker compose restart nginx
+
             echo "=== [7/6] Health check ==="
             ./scripts/check-health.sh
 

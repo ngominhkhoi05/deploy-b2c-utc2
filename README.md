@@ -261,13 +261,19 @@ docker build -t flash-sale-b2c-backend:latest \
 cd /opt/flash-sale/flash-sale-b2c-fe
 
 # BẮT BUỘC truyền build-arg NEXT_PUBLIC_API_URL.
-# Code FE (repo flash-sale-b2c-fe) đọc:
-#   - process.env.NEXT_PUBLIC_API_URL  trong src/lib/api/client.ts
-#   - process.env.NEXT_PUBLIC_WS_URL   trong src/lib/stomp.ts
+# Code FE (repo flash-sale-b2c-fe) đọc 5 biến:
+#   - process.env.NEXT_PUBLIC_API_URL         trong src/lib/api/client.ts
+#   - process.env.NEXT_PUBLIC_WS_URL          trong src/lib/stomp.ts
+#   - process.env.NEXT_PUBLIC_USE_MOCK        gate cho fetch mock (false = gọi API thật)
+#   - process.env.NEXT_PUBLIC_SITE_URL        absolute URL cho OG tags / sitemap
+#   - process.env.NEXT_PUBLIC_DEFAULT_LOCALE  locale mặc định (vi / en)
 # Phải khớp tên biến trong Dockerfile (xem docker/frontend.Dockerfile).
 docker build -t flash-sale-b2c-frontend:latest \
     --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
     --build-arg NEXT_PUBLIC_WS_URL= \
+    --build-arg NEXT_PUBLIC_USE_MOCK=false \
+    --build-arg NEXT_PUBLIC_SITE_URL=http://180.93.137.28 \
+    --build-arg NEXT_PUBLIC_DEFAULT_LOCALE=vi \
     -f /opt/flash-sale/deploy-b2c-utc2/docker/frontend.Dockerfile \
     /opt/flash-sale/flash-sale-b2c-fe/
 ```
@@ -276,6 +282,11 @@ docker build -t flash-sale-b2c-frontend:latest \
 > Nếu không truyền, FE fallback về `http://localhost:8080` → trình duyệt của người dùng gọi vào localhost của họ → trang trắng.
 >
 > 💡 **Để trống `--build-arg NEXT_PUBLIC_WS_URL=`** — SockJS sẽ tự dùng `window.location.host` (cùng host với trang web) → ws://<VPS_IP>/ws tự động, không cần hard-code IP/domain.
+
+> 🆕 **3 build-arg mới (FE repo `trangkimdat2005/flash-sale-b2c-fe` mới thêm):**
+> - `NEXT_PUBLIC_USE_MOCK=false` — production BẮT BUỘC `false` (gọi API thật). Mặc định trong Dockerfile = `false`, truyền để chắc chắn.
+> - `NEXT_PUBLIC_SITE_URL=http://<VPS_IP>` — đổi `<VPS_IP>` thành IP/domain thật. Khi có HTTPS thì sửa thành `https://your-domain.com`.
+> - `NEXT_PUBLIC_DEFAULT_LOCALE=vi` — locale mặc định. Mặc định trong Dockerfile = `vi`, truyền để chắc chắn.
 
 ### 5.3 Verify
 
@@ -476,6 +487,9 @@ cd /opt/flash-sale/flash-sale-b2c-fe && git pull
 docker build -t flash-sale-b2c-frontend:latest \
     --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
     --build-arg NEXT_PUBLIC_WS_URL= \
+    --build-arg NEXT_PUBLIC_USE_MOCK=false \
+    --build-arg NEXT_PUBLIC_SITE_URL=http://180.93.137.28 \
+    --build-arg NEXT_PUBLIC_DEFAULT_LOCALE=vi \
     -f /opt/flash-sale/deploy-b2c-utc2/docker/frontend.Dockerfile \
     /opt/flash-sale/flash-sale-b2c-fe/
 
@@ -557,6 +571,9 @@ cd /opt/flash-sale/flash-sale-b2c-fe
 docker build -t flash-sale-b2c-frontend:latest \
     --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
     --build-arg NEXT_PUBLIC_WS_URL= \
+    --build-arg NEXT_PUBLIC_USE_MOCK=false \
+    --build-arg NEXT_PUBLIC_SITE_URL=http://180.93.137.28 \
+    --build-arg NEXT_PUBLIC_DEFAULT_LOCALE=vi \
     -f /opt/flash-sale/deploy-b2c-utc2/docker/frontend.Dockerfile \
     /opt/flash-sale/flash-sale-b2c-fe/
 

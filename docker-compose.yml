@@ -127,7 +127,12 @@ services:
       # trước khi `docker compose up -d`.
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]
+      # ⚠️ KHÔNG dùng `wget -q --spider` (HEAD request) — đã test thực tế thấy
+      # exit ≠ 0 ngay cả khi upstream Next.js trả 200 OK, có thể do Next.js hoặc
+      # proxy_pass config không phản hồi đúng cho HEAD → container bị đánh dấu
+      # unhealthy liên tục dù site vẫn serve bình thường (observed 2026-10-12).
+      # Đổi sang GET request với `-O /dev/null` để chắc chắn pass khi server trả 200.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/ || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

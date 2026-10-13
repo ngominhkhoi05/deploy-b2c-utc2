@@ -119,8 +119,9 @@ services:
     environment:
       TZ: Asia/Ho_Chi_Minh
     ports:
-      # Port 80 - truy cập http://<VPS_IP>
-      - "80:80"
+      # Port 8080 on host → nginx:80 inside container.
+      # Cloudflared chạy trên host (không trong docker), gọi localhost:8080.
+      - "8080:80"
     volumes:
       # Relative path so compose chạy được trên cả Windows (dev/test)
       # lẫn Linux VPS (prod). Trên VPS chạy `cd /opt/deploy-b2c-utc2`

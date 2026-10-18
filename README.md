@@ -269,23 +269,23 @@ cd /opt/flash-sale/flash-sale-b2c-fe
 #   - process.env.NEXT_PUBLIC_DEFAULT_LOCALE  locale mặc định (vi / en)
 # Phải khớp tên biến trong Dockerfile (xem docker/frontend.Dockerfile).
 docker build -t flash-sale-b2c-frontend:latest \
-    --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
-    --build-arg NEXT_PUBLIC_WS_URL= \
+    --build-arg NEXT_PUBLIC_API_URL=https://vibe-mart-utc2.canluaz.io.vn \
+    --build-arg NEXT_PUBLIC_WS_URL=https://vibe-mart-utc2.canluaz.io.vn/ws \
     --build-arg NEXT_PUBLIC_USE_MOCK=false \
-    --build-arg NEXT_PUBLIC_SITE_URL=http://180.93.137.28 \
+    --build-arg NEXT_PUBLIC_SITE_URL=https://vibe-mart-utc2.canluaz.io.vn \
     --build-arg NEXT_PUBLIC_DEFAULT_LOCALE=vi \
     -f /opt/flash-sale/deploy-b2c-utc2/docker/frontend.Dockerfile \
     /opt/flash-sale/flash-sale-b2c-fe/
 ```
 
-> ⚠️ **Bắt buộc phải truyền `--build-arg NEXT_PUBLIC_API_URL=/api/v1`.**
+> ⚠️ **Bắt buộc phải truyền `--build-arg NEXT_PUBLIC_API_URL=https://vibe-mart-utc2.canluaz.io.vn`.**
 > Nếu không truyền, FE fallback về `http://localhost:8080` → trình duyệt của người dùng gọi vào localhost của họ → trang trắng.
 >
-> 💡 **Để trống `--build-arg NEXT_PUBLIC_WS_URL=`** — SockJS sẽ tự dùng `window.location.host` (cùng host với trang web) → ws://<VPS_IP>/ws tự động, không cần hard-code IP/domain.
+> 💡 **Truyền `--build-arg NEXT_PUBLIC_WS_URL=https://vibe-mart-utc2.canluaz.io.vn/ws`** — trỏ thẳng về endpoint WSS public để FE không phải dựa vào `window.location.host` (quan trọng khi FE serve qua CDN khác origin hoặc tách domain).
 
 > 🆕 **3 build-arg mới (FE repo `trangkimdat2005/flash-sale-b2c-fe` mới thêm):**
 > - `NEXT_PUBLIC_USE_MOCK=false` — production BẮT BUỘC `false` (gọi API thật). Mặc định trong Dockerfile = `false`, truyền để chắc chắn.
-> - `NEXT_PUBLIC_SITE_URL=http://<VPS_IP>` — đổi `<VPS_IP>` thành IP/domain thật. Khi có HTTPS thì sửa thành `https://your-domain.com`.
+> - `NEXT_PUBLIC_SITE_URL=https://vibe-mart-utc2.canluaz.io.vn` — absolute URL cho OG tags / sitemap.
 > - `NEXT_PUBLIC_DEFAULT_LOCALE=vi` — locale mặc định. Mặc định trong Dockerfile = `vi`, truyền để chắc chắn.
 
 ### 5.3 Verify
@@ -485,10 +485,10 @@ cd D:\flash-sale-b2c-fe && git add -A && git commit -m "..." && git push
 cd /opt/flash-sale/flash-sale-b2c-fe && git pull
 
 docker build -t flash-sale-b2c-frontend:latest \
-    --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
-    --build-arg NEXT_PUBLIC_WS_URL= \
+    --build-arg NEXT_PUBLIC_API_URL=https://vibe-mart-utc2.canluaz.io.vn \
+    --build-arg NEXT_PUBLIC_WS_URL=https://vibe-mart-utc2.canluaz.io.vn/ws \
     --build-arg NEXT_PUBLIC_USE_MOCK=false \
-    --build-arg NEXT_PUBLIC_SITE_URL=http://180.93.137.28 \
+    --build-arg NEXT_PUBLIC_SITE_URL=https://vibe-mart-utc2.canluaz.io.vn \
     --build-arg NEXT_PUBLIC_DEFAULT_LOCALE=vi \
     -f /opt/flash-sale/deploy-b2c-utc2/docker/frontend.Dockerfile \
     /opt/flash-sale/flash-sale-b2c-fe/
@@ -569,10 +569,10 @@ docker compose logs frontend
 ```bash
 cd /opt/flash-sale/flash-sale-b2c-fe
 docker build -t flash-sale-b2c-frontend:latest \
-    --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
-    --build-arg NEXT_PUBLIC_WS_URL= \
+    --build-arg NEXT_PUBLIC_API_URL=https://vibe-mart-utc2.canluaz.io.vn \
+    --build-arg NEXT_PUBLIC_WS_URL=https://vibe-mart-utc2.canluaz.io.vn/ws \
     --build-arg NEXT_PUBLIC_USE_MOCK=false \
-    --build-arg NEXT_PUBLIC_SITE_URL=http://180.93.137.28 \
+    --build-arg NEXT_PUBLIC_SITE_URL=https://vibe-mart-utc2.canluaz.io.vn \
     --build-arg NEXT_PUBLIC_DEFAULT_LOCALE=vi \
     -f /opt/flash-sale/deploy-b2c-utc2/docker/frontend.Dockerfile \
     /opt/flash-sale/flash-sale-b2c-fe/

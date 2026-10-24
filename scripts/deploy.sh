@@ -92,7 +92,12 @@ docker compose ps
 
 # Đếm container đang chạy. Nếu thiếu → KHÔNG được báo "deploy hoàn tất".
 RUNNING=$(docker compose ps --status running -q | wc -l | tr -d ' ')
-EXPECTED=4   # redis, backend, frontend, nginx
+# 5 containers: redis, opensearch, backend, frontend, nginx.
+# ⚠️ opensearch PHẢI được đếm: backend phụ thuộc cứng vào nó
+# (depends_on: opensearch: condition: service_healthy). Nếu chỉ đếm 4,
+# trường hợp thiếu search engine vẫn bị báo "deploy hoàn tất" → người dùng
+# tưởng đã xong nhưng tìm kiếm toàn văn im lặng chạy sai (fallback LIKE).
+EXPECTED=5
 
 echo ""
 if [ "$RUNNING" -lt "$EXPECTED" ]; then
@@ -104,6 +109,10 @@ if [ "$RUNNING" -lt "$EXPECTED" ]; then
     echo "  docker compose logs --tail=50 backend"
     echo "  docker compose logs --tail=50 frontend"
     echo ""
+    echo "⚠️ Nếu opensearch không chạy/unhealthy, backend sẽ KHÔNG lên (depends_on:"
+    echo "   opensearch: condition: service_healthy) và tìm kiếm toàn văn sẽ"
+    echo "   fallback sang LIKE trong DB (sai chính tả, không xếp hạng relevance)."
+    echo "   docker compose logs --tail=50 opensearch"
     echo "Lưu ý: backend cần thời gian khởi động (Flyway migration + kết nối"
     echo "Supabase). Nếu backend vẫn 'starting', chờ rồi kiểm tra lại:"
     echo "  sleep 30 && docker compose ps"
@@ -120,6 +129,16 @@ echo "  • Health check:   ./scripts/check-health.sh"
 echo "  • Xem log:        docker compose logs -f backend"
 echo "  • Xem log FE:     docker compose logs -f frontend"
 echo "  • Xem log Nginx:  docker compose logs -f nginx"
+echo ""
+echo "⚠️ SEARCH TOÀN VĂN — cần nạp index sau khi deploy:"
+echo "   Lúc boot, backend chỉ tạo index + alias (rỗng). Scheduler reconcile"
+echo "   chỉ quét sản phẩm đổi trong 5 phút gần nhất, nên index có thể rỗng."
+echo "   Admin phải gọi reindex 1 lần (idempotent):"
+echo "     curl -X POST http://localhost:8080/api/v1/admin/search/reindex \\"
+echo "          -H \"Authorization: Bearer \$ADMIN_TOKEN\""
+echo "   Kiểm tra số document trong index:"
+echo "     curl http://localhost:8080/api/v1/admin/search/status \\"
+echo "          -H \"Authorization: Bearer \$ADMIN_TOKEN\""
 echo ""
 VPS_IP=$(grep '^VPS_IP=' .env | cut -d= -f2-)
 echo "  • Truy cập:       http://${VPS_IP}"

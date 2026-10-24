@@ -25,32 +25,32 @@ jobs:
           script: |
             set -euo pipefail
 
-            echo "=== [1/6] Pull backend repo ==="
+            echo "=== [1/8] Pull backend repo ==="
             cd /opt/flash-sale/flash-sale-b2c-UTC2
             git fetch origin dev
             git reset --hard origin/dev
             git log --oneline -1
 
-            echo "=== [2/6] Pull frontend repo ==="
+            echo "=== [2/8] Pull frontend repo ==="
             cd /opt/flash-sale/flash-sale-b2c-fe
             git fetch origin dev
             git reset --hard origin/dev
             git log --oneline -1
 
-            echo "=== [3/6] Pull deploy repo (compose + nginx + scripts) ==="
+            echo "=== [3/8] Pull deploy repo (compose + nginx + scripts) ==="
             cd /opt/flash-sale/deploy-b2c-utc2
             git fetch origin main
             git reset --hard origin/main
             git log --oneline -1
 
-            echo "=== [4/6] Build backend image ==="
+            echo "=== [4/8] Build backend image ==="
             cd /opt/flash-sale/flash-sale-b2c-UTC2
             docker build \
               -t flash-sale-b2c-backend:latest \
               -f /opt/flash-sale/deploy-b2c-utc2/docker/backend.Dockerfile \
               .
 
-            echo "=== [5/6] Build frontend image ==="
+            echo "=== [5/8] Build frontend image ==="
             docker build \
               -t flash-sale-b2c-frontend:latest \
               --build-arg NEXT_PUBLIC_API_URL=https://vibe-mart-utc2.canluaz.io.vn \
@@ -61,11 +61,36 @@ jobs:
               -f /opt/flash-sale/deploy-b2c-utc2/docker/frontend.Dockerfile \
               /opt/flash-sale/flash-sale-b2c-fe/
 
-            echo "=== [6/6] Recreate backend + frontend containers ==="
+            echo "=== [6/8] Build OpenSearch image (full-text search engine) ==="
+            # Service `opensearch` trong docker-compose.yml dùng `build:` (không
+            # phải image có sẵn trên registry) + Dockerfile riêng cài plugin
+            # `analysis-icu` (bắt buộc cho analyzer `vi_folding` bỏ dấu tiếng Việt).
+            # Thiếu bước này -> container không có image local -> không start được.
             cd /opt/flash-sale/deploy-b2c-utc2
+            docker compose build opensearch
+
+            echo "=== [7/8] Start OpenSearch + wait until healthy ==="
+            # ⚠️ THỨ TỰ QUAN TRỌNG:
+            #   `docker compose up -d --no-deps backend frontend` KHÔNG start
+            #   opensearch (đó là định nghĩa của --no-deps) -> backend boot với
+            #   search engine chưa có -> SearchIndexBootstrap chạy ở
+            #   ApplicationReadyEvent, tạo index FAIL -> phải restart backend mới
+            #   tạo được index. Tìm kiếm toàn văn im lặng rơi về LIKE trong DB
+            #   (sai chính tả, không xếp hạng relevance).
+            #
+            #   `--wait` chặn cho tới khi healthcheck của opensearch trả
+            #   green/yellow (đã verify: exit code 1 nếu unhealthy).
+            #   `--wait-timeout` chặn CI treo vô hạn khi OS không lên được.
+            docker compose up -d --wait --wait-timeout 180 opensearch
+
+            echo "=== [7b/8] Recreate backend + frontend containers ==="
+            cd /opt/flash-sale/deploy-b2c-utc2
+            # Giữ --no-deps ở đây: nginx dùng image `nginx:1.27-alpine` từ
+            # registry (không phải image local) nên không cần build, và không
+            # muốn Compose recreate nó trước khi reload config (xem bước 7c).
             docker compose up -d --no-deps backend frontend
 
-            echo "=== [6b/6] Restart nginx to reload config (nginx/default.conf) ==="
+            echo "=== [7c/8] Restart nginx to reload config (nginx/default.conf) ==="
             # nginx/default.conf is bind-mounted from host. After `git pull`,
             # the new file is on disk but the running nginx container still
             # uses the old config in memory. `docker compose pull` does not
@@ -73,7 +98,7 @@ jobs:
             # a local build), so we must restart it explicitly.
             docker compose restart nginx
 
-            echo "=== [7/6] Health check ==="
+            echo "=== [8/8] Health check ==="
             ./scripts/check-health.sh
 
             echo "=== DONE ==="

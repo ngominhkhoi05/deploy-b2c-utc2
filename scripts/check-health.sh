@@ -41,41 +41,59 @@ echo "▶ Redis status:"
 $REDIS_CMD ping 2>&1 || echo "❌ Redis không phản hồi"
 echo ""
 
-# 3. Backend health (actuator) — qua bind localhost:8080 trên host
+# 3. OpenSearch (full-text search) — qua bind localhost:9200 trên host
+# ⚠️ Health check này là "canh cảnh" cho đúng lớp lỗi "deploy xong nhưng
+#    search không hoạt động": nếu OS không trả lời, backend vẫn chạy được
+#    (fallback LIKE trong DB) nên deploy vẫn báo thành công — nhưng tìm kiếm
+#    toàn văn thì im lặng trả kết quả sai (không bỏ dấu, không xếp hạng).
+echo "▶ OpenSearch (direct :9200):"
+OS_HTTP=$(curl -s -k -o /dev/null -w "%{http_code}" \
+    "https://localhost:9200" 2>/dev/null || echo "000")
+if [ "$OS_HTTP" = "401" ] || [ "$OS_HTTP" = "200" ]; then
+    echo "HTTP $OS_HTTP (OpenSearch phản hồi)"
+elif [ "$OS_HTTP" = "000" ]; then
+    echo "❌ OpenSearch không phản hồi — search toàn văn sẽ fallback LIKE (sai chính tả)"
+    echo "   docker compose logs --tail=50 opensearch"
+else
+    echo "⚠️ OpenSearch trả HTTP $OS_HTTP (mong đợi 200 hoặc 401 do basic auth)"
+fi
+echo ""
+
+# 4. Backend health (actuator) — qua bind localhost:8080 trên host
 echo "▶ Backend /actuator/health (direct):"
 curl -s -o /dev/null -w "HTTP %{http_code} (%{time_total}s)\n" \
     "http://localhost:8080/actuator/health" 2>&1 || echo "❌ Backend không phản hồi"
 echo ""
 
-# 4. Frontend qua Nginx
+# 5. Frontend qua Nginx
 echo "▶ Frontend via Nginx (root):"
 curl -s -o /dev/null -w "HTTP %{http_code} (%{time_total}s)\n" \
     "http://localhost/" 2>&1 || echo "❌ Frontend không phản hồi"
 echo ""
 
-# 5. Backend API qua Nginx
+# 6. Backend API qua Nginx
 echo "▶ Backend API via Nginx (/api/v1/products):"
 curl -s -o /dev/null -w "HTTP %{http_code} (%{time_total}s)\n" \
     "http://localhost/api/v1/products" 2>&1 || echo "❌ API không phản hồi"
 echo ""
 
-# 6. WebSocket endpoint info
+# 7. WebSocket endpoint info
 echo "▶ WebSocket endpoint (/ws/info):"
 curl -s -o /dev/null -w "HTTP %{http_code} (%{time_total}s)\n" \
     "http://localhost/ws/info" 2>&1 || echo "❌ WebSocket không phản hồi"
 echo ""
 
-# 7. Redis key count (debug)
+# 8. Redis key count (debug)
 echo "▶ Redis keys (count):"
 $REDIS_CMD dbsize 2>&1 || echo "  (không có quyền)"
 echo ""
 
-# 8. Disk usage
+# 9. Disk usage
 echo "▶ Disk usage:"
 df -h / | tail -1
 echo ""
 
-# 9. Docker volume size
+# 10. Docker volume size
 echo "▶ Docker volumes:"
 docker system df -v 2>&1 | grep -E "(VOLUME|flash-sale)" || echo "  (không tìm thấy volume)"
 echo ""

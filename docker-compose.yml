@@ -71,12 +71,17 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      opensearch:
+        condition: service_healthy
     env_file:
       - .env
     environment:
       # Override dùng internal Docker DNS name cho Redis
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # OpenSearch chạy trong cùng Docker network → dùng service name,
+      # KHÔNG dùng localhost (localhost trong container là chính nó).
+      OPENSEARCH_HOST: https://opensearch:9200
       # DB_HOST giữ nguyên trong .env (Supabase Cloud)
       TZ: Asia/Ho_Chi_Minh
       # JAVA_OPTS đã có sẵn trong .env.example. Nếu .env thiếu, dùng default.
@@ -102,6 +107,53 @@ services:
       # App cần thời gian: JVM boot + Flyway migration + kết nối Supabase.
       # Tổng thời gian chờ = start_period + (retries × interval) = 150 + 75s.
       start_period: 150s
+    networks:
+      - flash-sale-net
+
+  # ── OPENSEARCH (Full-text search) ───────────────────────────────────
+  # Vai trò: bộ lọc + bộ xếp hạng (trả về product IDs theo thứ tự relevance).
+  # Backend hydrate dữ liệu hiển thị từ PostgreSQL (mô hình search-then-hydrate).
+  opensearch:
+    build:
+      context: ./docker/opensearch
+      dockerfile: Dockerfile
+    image: flash-sale-b2c-opensearch:3-local
+    container_name: flash-sale-b2c-opensearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - cluster.name=flash-sale-b2c-search
+      - node.name=os-node-1
+      - bootstrap.memory_lock=true
+      # Bắt buộc mạnh: 8-100 ký tự, hoa + thường + số + ký tự đặc biệt,
+      # zxcvbn >= "strong". `mysecretpassword` KHÔNG dùng được (container exit 1).
+      # ⚠️ ĐỔI MẬT KHẨU Ở ĐÂY KHÔNG CÓ TÁC DỤNG sau lần boot đầu — biến này
+      # chỉ được đọc 1 lần lần khởi động đầu. Muốn đổi → `docker compose down -v`
+      # rồi `docker compose up -d opensearch` (XOÁ cả index đã build).
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD:?OPENSEARCH_INITIAL_ADMIN_PASSWORD chua duoc dat trong .env}
+      # -Xms == -Xmx == 50% RAM host theo khuyến nghị OpenSearch cho dev.
+      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      # Chỉ bind localhost — KHÔNG public 9200 ra Internet.
+      # Backend trong Docker dùng internal DNS `https://opensearch:9200`.
+      - "127.0.0.1:9200:9200"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      # Demo cert của OpenSearch tự ký → dùng -k.
+      # -u admin dùng biến đã set trong container.
+      test: ["CMD-SHELL", "curl -kfsS -u admin:$${OPENSEARCH_INITIAL_ADMIN_PASSWORD} https://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
     networks:
       - flash-sale-net
 
@@ -161,6 +213,8 @@ services:
 volumes:
   redis-data:
     name: flash-sale-b2c-redis-data
+  opensearch-data:
+    name: flash-sale-b2c-opensearch-data
 
 # ── NETWORKS ────────────────────────────────────────────────────────────
 networks:

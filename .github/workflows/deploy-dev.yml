@@ -69,6 +69,26 @@ jobs:
             cd /opt/flash-sale/deploy-b2c-utc2
             docker compose build opensearch
 
+            echo "=== [6b/8] Export OpenSearch CA + build backend truststore ==="
+            # ⚠️ BẮT BUỘC, không được bỏ qua:
+            #   Cert của OpenSearch được bake vào image lúc build (SAN =
+            #   DNS:opensearch). Backend phải tin đúng CA đó, nếu không
+            #   handshake fail với "PKIX path building failed" -> search toàn
+            #   văn im lặng rơi về LIKE trong DB (sai dấu, không xếp hạng).
+            #
+            #   CA được export TỪ IMAGE (không copy riêng trong repo) nên CA mà
+            #   backend tin và CA đã ký cert không bao giờ lệch nhau.
+            #
+            #   Truststore gồm CA của JDK + CA search: -Djavax.net.ssl.trustStore
+            #   THAY THẾ toàn bộ CA mặc định của JVM, nếu thiếu CA public thì
+            #   Supabase / Cloudinary / ZaloPay / Google OAuth đều fail.
+            #
+            #   Build truststore TRƯỚC khi start backend: compose mount file
+            #   này vào container, thiếu file -> Docker tạo directory -> JVM
+            #   fail boot với "Invalid keystore format".
+            ./scripts/export-opensearch-ca.sh
+            ./scripts/build-truststore.sh
+
             echo "=== [7/8] Start OpenSearch + wait until healthy ==="
             # ⚠️ THỨ TỰ QUAN TRỌNG:
             #   `docker compose up -d --no-deps backend frontend` KHÔNG start

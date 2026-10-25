@@ -38,6 +38,17 @@ db/backups/
 *.rdb
 *.aof
 
+# ── OpenSearch TLS material (generated on the VPS) ────────────────────
+# CA + truststore của OpenSearch được SINH RA trên VPS bằng
+# scripts/export-opensearch-ca.sh + scripts/build-truststore.sh, KHÔNG
+# commit lên git:
+#   - CA được export từ image OpenSearch (chứa private key của CA), nên
+#     commit vào repo sẽ làm lộ private key.
+#   - Truststore phụ thuộc đúng image đang chạy; commit vào repo sẽ dễ
+#     lệch CA sau khi rebuild image.
+# Thư mục này được mount vào container backend (read-only).
+secrets/opensearch/
+
 # ── Docker artifacts ──────────────────────────────────────────────────
 docker-compose.override.yml
 docker-compose.local.yml

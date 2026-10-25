@@ -63,7 +63,35 @@ if [ ! -f "redis.env" ]; then
     exit 1
 fi
 
-# ─── 2. Khởi động stack ────────────────────────────────────────────────
+# ─── 2. Chuẩn bị TLS cho backend ↔ OpenSearch ──────────────────────────
+# Cert của OpenSearch được bake vào image lúc build (SAN = DNS:opensearch).
+# Backend cần trust đúng CA đó, nếu không handshake fail:
+#   "No subject alternative names matching opensearch found"
+# và search toàn văn im lặng rơi về LIKE trong DB (sai dấu, không xếp hạng).
+#
+# ⚠️ Truststore PHẢI có cả CA của JDK. -Djavax.net.ssl.trustStore thay thế
+#    toàn bộ CA mặc định của JVM; thiếu CA public thì Supabase / Cloudinary
+#    / ZaloPay / Google OAuth đều fail.
+#
+# CA được export TỪ IMAGE (không copy riêng trong repo) nên CA mà backend tin
+# và CA đã ký cert không bao giờ lệch nhau.
+echo "==> Chuẩn bị truststore OpenSearch cho backend..."
+if ! ./scripts/export-opensearch-ca.sh; then
+    echo ""
+    echo "❌ Không export được CA của OpenSearch."
+    echo "   Nếu image chưa được build, build trước:"
+    echo "     docker compose build opensearch"
+    exit 1
+fi
+
+if ! ./scripts/build-truststore.sh; then
+    echo ""
+    echo "❌ Không build được truststore cho backend."
+    echo "   Backend sẽ không boot được (Invalid keystore format)."
+    exit 1
+fi
+
+# ─── 3. Khởi động stack ────────────────────────────────────────────────
 # KHÔNG tạo network thủ công ở đây.
 # docker-compose.yml khai báo networks: flash-sale-net (name: flash-sale-net)
 # nên `docker compose up` TỰ tạo network kèm label com.docker.compose.*.
@@ -81,11 +109,13 @@ if ! docker compose up -d; then
     echo "       ./scripts/deploy.sh"
     echo "   - Nếu thấy 'pull access denied', image backend/frontend chưa build."
     echo "     Build trước (README §5.1) rồi chạy lại script này."
+    echo "   - Nếu thấy 'Invalid keystore format', truststore chưa được mount"
+    echo "     đúng. Chạy: ./scripts/build-truststore.sh"
     echo "   - Xem log chi tiết: docker compose up -d 2>&1 | tail -30"
     exit 1
 fi
 
-# ─── 3. Kiểm tra container ─────────────────────────────────────────────
+# ─── 4. Kiểm tra container ─────────────────────────────────────────────
 echo ""
 echo "==> Trạng thái containers:"
 docker compose ps
@@ -117,6 +147,47 @@ if [ "$RUNNING" -lt "$EXPECTED" ]; then
     echo "Supabase). Nếu backend vẫn 'starting', chờ rồi kiểm tra lại:"
     echo "  sleep 30 && docker compose ps"
     echo "  ./scripts/check-health.sh"
+    exit 1
+fi
+
+# ─── 5. Xác minh TLS backend ↔ OpenSearch ───────────────────────────────
+# ⚠️ Đây là lớp lỗi im lặng nguy hiểm nhất: container đều "running" nhưng
+#    backend KHÔNG nối được OpenSearch -> search toàn văn fallback LIKE
+#    trong DB (sai dấu tiếng Việt, không xếp hạng relevance) mà không có
+#    lỗi nào hiện ra cho người dùng.
+#
+#    Đây KHÔNG phải check thừa: nó là tiêu chí "deploy hoàn tất" thực sự.
+echo ""
+echo "==> Xác minh TLS backend ↔ OpenSearch..."
+TLS_HTTP=$(docker run --rm \
+    --network flash-sale-net \
+    -v "$(pwd)/secrets/opensearch/ca.pem:/ca.pem:ro" \
+    --entrypoint sh \
+    flash-sale-b2c-opensearch:3-local -c "
+        curl --cacert /ca.pem -s -o /dev/null -w '%{http_code}' \
+            -u admin:\"\$OPENSEARCH_INITIAL_ADMIN_PASSWORD\" \
+            https://opensearch:9200/_cluster/health 2>/dev/null
+    " 2>/dev/null | tr -d '[:space:]')
+
+if [ "${TLS_HTTP:-000}" = "200" ]; then
+    echo "✅ TLS backend ↔ OpenSearch OK (HTTP 200 qua hostname 'opensearch')"
+else
+    echo ""
+    echo "=================================================="
+    echo "  ⚠️  Deploy CHƯA hoàn tất: TLS tới OpenSearch FAIL (HTTP ${TLS_HTTP:-000})"
+    echo "=================================================="
+    echo ""
+    echo "Backend dùng https://opensearch:9200 với cert SAN=DNS:opensearch."
+    echo "Handshake fail -> search toàn văn fallback LIKE trong DB (sai dấu,"
+    echo "không xếp hạng relevance) và KHÔNG có lỗi nào hiện ra cho người dùng."
+    echo ""
+    echo "Cách sửa:"
+    echo "  ./scripts/export-opensearch-ca.sh   # export CA từ image"
+    echo "  ./scripts/build-truststore.sh       # build truststore cho backend"
+    echo "  docker compose up -d --force-recreate backend"
+    echo ""
+    echo "Xem log backend:"
+    echo "  docker compose logs --tail=50 backend"
     exit 1
 fi
 

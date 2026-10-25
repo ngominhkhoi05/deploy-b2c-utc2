@@ -151,6 +151,143 @@ else
     fail "deploy.sh does not mention reindex -> index stays empty after deploy"
 fi
 
+# --- Test 10: OpenSearch image ships a cert with SAN=opensearch -------
+# The demo certificate has SAN = node-0.example.com / localhost / 127.0.0.1
+# and NEVER contains "opensearch", which is the Compose service name the
+# backend connects to. With ssl-trust-all=false the handshake fails with
+# "No subject alternative names matching opensearch found" and full-text
+# search silently falls back to PostgreSQL LIKE.
+echo "[10] OpenSearch image builds a node certificate with SAN=opensearch"
+GEN_CERTS="$DEPLOY_DIR/docker/opensearch/generate-certs.sh"
+OS_DOCKERFILE="$DEPLOY_DIR/docker/opensearch/Dockerfile"
+
+if [ ! -f "$GEN_CERTS" ]; then
+    fail "docker/opensearch/generate-certs.sh is missing"
+elif ! grep -q 'DNS:opensearch' "$GEN_CERTS"; then
+    fail "generate-certs.sh does not put DNS:opensearch in the node certificate SAN"
+elif ! grep -q 'verify_hostname opensearch' "$GEN_CERTS"; then
+    fail "generate-certs.sh does not verify the SAN for hostname 'opensearch'"
+else
+    pass "generate-certs.sh creates + verifies a node cert with SAN DNS:opensearch"
+fi
+
+# --- Test 11: the cert is baked into the OpenSearch image -------------
+echo "[11] OpenSearch Dockerfile bakes the certificates into the image"
+if [ ! -f "$OS_DOCKERFILE" ]; then
+    fail "docker/opensearch/Dockerfile is missing"
+elif ! grep -q -- '--from=certbuilder' "$OS_DOCKERFILE"; then
+    fail "Dockerfile does not COPY the generated certificates into the image"
+elif ! grep -q 'esnode.pem' "$OS_DOCKERFILE"; then
+    fail "Dockerfile does not install esnode.pem (the node certificate)"
+elif ! grep -q 'root-ca.pem' "$OS_DOCKERFILE"; then
+    fail "Dockerfile does not install root-ca.pem (the CA the backend must trust)"
+else
+    pass "Dockerfile bakes esnode.pem + root-ca.pem into the image"
+fi
+
+# --- Test 12: backend gets a truststore with the JDK default CAs ------
+# -Djavax.net.ssl.trustStore REPLACES the JVM default CA set. A truststore
+# with only the search CA breaks Supabase / Cloudinary / ZaloPay / Google
+# OAuth, so the truststore must be built from the JDK cacerts + the CA.
+echo "[12] backend truststore contains the JDK default CAs + the search CA"
+if [ ! -f "$DEPLOY_DIR/scripts/build-truststore.sh" ]; then
+    fail "scripts/build-truststore.sh is missing"
+elif ! grep -q 'cacerts' "$DEPLOY_DIR/scripts/build-truststore.sh"; then
+    fail "build-truststore.sh does not start from the JDK default cacerts"
+elif ! grep -q 'fs-search-ca' "$DEPLOY_DIR/scripts/build-truststore.sh"; then
+    fail "build-truststore.sh does not import the search CA"
+else
+    pass "build-truststore.sh builds the truststore from cacerts + the search CA"
+fi
+
+# --- Test 13: compose mounts the truststore into the backend ----------
+# Without the mount the backend has no way to trust the OpenSearch CA and
+# fails to boot with "Invalid keystore format" (or silently falls back).
+echo "[13] docker-compose.yml mounts the truststore into the backend"
+if ! grep -q 'truststore.p12' "$COMPOSE_FILE"; then
+    fail "docker-compose.yml does not mount truststore.p12 into the backend"
+elif ! grep -q 'javax.net.ssl.trustStore' "$COMPOSE_FILE"; then
+    fail "docker-compose.yml does not set -Djavax.net.ssl.trustStore for the backend"
+elif ! grep -q 'javax.net.ssl.trustStoreType' "$COMPOSE_FILE"; then
+    fail "docker-compose.yml does not set -Djavax.net.ssl.trustStoreType=PKCS12"
+else
+    pass "backend receives truststore.p12 + the matching JVM system properties"
+fi
+
+# --- Test 14: the CA is exported from the built image -----------------
+# Keeping a copy of the CA in the repo would let it drift away from the CA
+# that actually signed the OpenSearch certificate, breaking the handshake.
+echo "[14] the CA is exported from the built image (no drift)"
+EXPORT_CA="$DEPLOY_DIR/scripts/export-opensearch-ca.sh"
+if [ ! -f "$EXPORT_CA" ]; then
+    fail "scripts/export-opensearch-ca.sh is missing"
+elif ! grep -q 'root-ca.pem' "$EXPORT_CA"; then
+    fail "export-opensearch-ca.sh does not read root-ca.pem from the image"
+elif ! grep -q 'docker cp' "$EXPORT_CA"; then
+    fail "export-opensearch-ca.sh does not extract the CA from the image"
+else
+    pass "the CA is extracted from the built image, so it cannot drift"
+fi
+
+# --- Test 15: deploy.sh gates on the TLS handshake -------------------
+# "All containers running" is NOT the same as "search works". A backend
+# that cannot complete the handshake still starts fine and silently serves
+# LIKE-based search results.
+echo "[15] deploy.sh verifies the backend -> OpenSearch TLS handshake"
+if ! grep -q 'export-opensearch-ca.sh' "$DEPLOY_SH"; then
+    fail "deploy.sh does not export the OpenSearch CA"
+elif ! grep -q 'build-truststore.sh' "$DEPLOY_SH"; then
+    fail "deploy.sh does not build the backend truststore"
+elif ! grep -q 'https://opensearch:9200' "$DEPLOY_SH"; then
+    fail "deploy.sh does not probe https://opensearch:9200 (the SAN-sensitive URL)"
+else
+    pass "deploy.sh exports the CA, builds the truststore and probes the TLS handshake"
+fi
+
+# --- Test 16: the CI workflow builds the truststore before the backend --
+echo "[16] deploy-dev.yml builds the truststore BEFORE starting the backend"
+CA_LINE=$(line_of "$WORKFLOW" 'export-opensearch-ca.sh')
+TS_LINE=$(line_of "$WORKFLOW" 'build-truststore.sh')
+BACKEND_LINE=$(line_of "$WORKFLOW" 'docker compose up.*backend')
+
+if [ -z "$CA_LINE" ]; then
+    fail "workflow has no 'export-opensearch-ca.sh'"
+elif [ -z "$TS_LINE" ]; then
+    fail "workflow has no 'build-truststore.sh'"
+elif [ -z "$BACKEND_LINE" ]; then
+    fail "workflow has no 'docker compose up ... backend'"
+elif [ "$CA_LINE" -lt "$BACKEND_LINE" ] && [ "$TS_LINE" -lt "$BACKEND_LINE" ]; then
+    pass "CA export (line $CA_LINE) and truststore build (line $TS_LINE) precede the backend (line $BACKEND_LINE)"
+else
+    fail "the truststore must be built BEFORE the backend starts (backend at line ${BACKEND_LINE:-none})"
+fi
+
+# --- Test 17: the OpenSearch healthcheck verifies the certificate -----
+# `curl -k` skips certificate verification, so a broken or wrong-SAN
+# certificate would still report healthy -> the backend would boot and
+# then fail the handshake.
+echo "[17] the OpenSearch healthcheck verifies the certificate (no -k)"
+OS_HEALTH=$(awk '/healthcheck:/,/networks:/' "$COMPOSE_FILE" | grep -n 'curl' | grep 'cluster/health' | head -1)
+if [ -z "$OS_HEALTH" ]; then
+    fail "could not find the OpenSearch healthcheck curl command"
+elif echo "$OS_HEALTH" | grep -q -- '-k'; then
+    fail "the OpenSearch healthcheck still uses -k -> a broken cert would report healthy"
+elif ! echo "$OS_HEALTH" | grep -q -- '--cacert'; then
+    fail "the OpenSearch healthcheck does not use --cacert -> the cert is never verified"
+else
+    pass "the OpenSearch healthcheck verifies the certificate via --cacert"
+fi
+
+# --- Test 18: the generated secrets are not committed ----------------
+echo "[18] the generated OpenSearch TLS material stays out of git"
+if ! grep -q 'secrets/opensearch/' "$DEPLOY_DIR/.gitignore"; then
+    fail ".gitignore does not exclude secrets/opensearch/ -> the CA and truststore could be committed"
+elif git -C "$DEPLOY_DIR" ls-files --error-unmatch secrets/opensearch >/dev/null 2>&1; then
+    fail "secrets/opensearch is tracked by git -> the CA private key would be exposed"
+else
+    pass "secrets/opensearch/ is ignored and untracked"
+fi
+
 # --- Summary ---------------------------------------------------------
 echo ""
 echo "=================================================="

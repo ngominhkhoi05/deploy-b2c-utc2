@@ -82,6 +82,7 @@ services:
       # OpenSearch chạy trong cùng Docker network → dùng service name,
       # KHÔNG dùng localhost (localhost trong container là chính nó).
       OPENSEARCH_HOST: https://opensearch:9200
+      IMAGE_EMBEDDING_URL: http://image-embedding:8000
       # DB_HOST giữ nguyên trong .env (Supabase Cloud)
       TZ: Asia/Ho_Chi_Minh
       # JAVA_OPTS đã có sẵn trong .env.example. Nếu .env thiếu, dùng default.
@@ -192,6 +193,27 @@ services:
       timeout: 5s
       retries: 12
       start_period: 90s
+    networks:
+      - flash-sale-net
+
+  # ── IMAGE EMBEDDING (CLIP Model Service) ───────────────────────────
+  # Microservice Python trích xuất vector embedding 512 chiều từ ảnh
+  # phục vụ tính năng tìm kiếm sản phẩm bằng hình ảnh (pgvector).
+  image-embedding:
+    build:
+      context: ./docker/image-embedding
+      dockerfile: Dockerfile
+    image: flash-sale-b2c-image-embedding:latest
+    container_name: flash-sale-b2c-image-embedding
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - flash-sale-net
 

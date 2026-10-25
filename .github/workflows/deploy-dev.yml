@@ -67,7 +67,7 @@ jobs:
             # `analysis-icu` (bắt buộc cho analyzer `vi_folding` bỏ dấu tiếng Việt).
             # Thiếu bước này -> container không có image local -> không start được.
             cd /opt/flash-sale/deploy-b2c-utc2
-            docker compose build opensearch
+            docker compose build opensearch image-embedding
 
             echo "=== [6b/8] Export OpenSearch CA + build backend truststore ==="
             # ⚠️ BẮT BUỘC, không được bỏ qua:
@@ -108,7 +108,7 @@ jobs:
             # Giữ --no-deps ở đây: nginx dùng image `nginx:1.27-alpine` từ
             # registry (không phải image local) nên không cần build, và không
             # muốn Compose recreate nó trước khi reload config (xem bước 7c).
-            docker compose up -d --no-deps backend frontend
+            docker compose up -d --no-deps image-embedding backend frontend
 
             echo "=== [7c/8] Restart nginx to reload config (nginx/default.conf) ==="
             # nginx/default.conf is bind-mounted from host. After `git pull`,
